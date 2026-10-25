@@ -43,6 +43,7 @@ class ChartHandle internal constructor(
     internal val view: View
 ) {
     private var onEdited: () -> Unit = {}
+    private var onPopup: (Int) -> Unit = {}
 
     /** Registers a callback invoked after the user edits data through the chart. */
     fun setOnEdited(callback: () -> Unit) {
@@ -70,9 +71,18 @@ class ChartHandle internal constructor(
         return true
     }
 
+    /** Registers a callback asking the app to show the check-in popup for a day (days since 2000). */
+    fun setOnPopup(callback: (Int) -> Unit) {
+        onPopup = callback
+    }
+
     fun click(x: Double, y: Double) = view.onClick(x, y)
 
+    fun longClick(x: Double, y: Double) = view.onLongClick(x, y)
+
     internal fun notifyEdited() = onEdited()
+
+    internal fun requestPopup(date: LocalDate) = onPopup(date.daysSince2000)
 }
 
 internal fun buildHistoryChart(
@@ -97,21 +107,31 @@ internal fun buildHistoryChart(
         padding = padding
     )
     val handle = ChartHandle(canvas, chart)
+    fun redraw() {
+        val updated = HistoryCardPresenter.buildState(habit, preferences.firstWeekday, theme)
+        chart.series = updated.series
+        chart.notesIndicators = updated.notesIndicators
+        handle.draw()
+        handle.notifyEdited()
+    }
+    fun toggle(date: LocalDate) {
+        val entry = habit.computedEntries.get(date)
+        val next = Entry.nextToggleValue(
+            value = entry.value,
+            isSkipEnabled = preferences.isSkipEnabled,
+            areQuestionMarksEnabled = preferences.areQuestionMarksEnabled
+        )
+        execute(CreateRepetitionCommand(habitList, habit, date, next, entry.notes))
+        redraw()
+    }
+    // Same rules as core's HistoryCardPresenter; popups are shown by the app.
     chart.onDateClickedListener = object : OnDateClickedListener {
         override fun onDateShortPress(date: LocalDate) {
-            if (habit.isNumerical) return
-            val entry = habit.computedEntries.get(date)
-            val next = Entry.nextToggleValue(
-                value = entry.value,
-                isSkipEnabled = preferences.isSkipEnabled,
-                areQuestionMarksEnabled = preferences.areQuestionMarksEnabled
-            )
-            execute(CreateRepetitionCommand(habitList, habit, date, next, entry.notes))
-            val updated = HistoryCardPresenter.buildState(habit, preferences.firstWeekday, theme)
-            chart.series = updated.series
-            chart.notesIndicators = updated.notesIndicators
-            handle.draw()
-            handle.notifyEdited()
+            if (!habit.isNumerical && preferences.isShortToggleEnabled) toggle(date) else handle.requestPopup(date)
+        }
+
+        override fun onDateLongPress(date: LocalDate) {
+            if (!habit.isNumerical && !preferences.isShortToggleEnabled) toggle(date) else handle.requestPopup(date)
         }
     }
     return handle

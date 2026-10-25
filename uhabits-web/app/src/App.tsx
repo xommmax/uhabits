@@ -42,7 +42,7 @@ export function App({ core }: { core: HabitsCore }) {
           refresh={refresh}
           toast={toast}
           onOpen={(id) => setRoute({ screen: "habit", id })}
-          onAdd={() => setRoute({ screen: "edit", id: null })}
+          onAdd={(numerical) => setRoute({ screen: "edit", id: null, numerical })}
         />
       );
       break;
@@ -55,7 +55,7 @@ export function App({ core }: { core: HabitsCore }) {
           refresh={refresh}
           toast={toast}
           onBack={() => setRoute({ screen: "list" })}
-          onEdit={() => setRoute({ screen: "edit", id: route.id })}
+          onEdit={() => setRoute({ screen: "edit", id: route.id, numerical: false })}
         />
       );
       break;
@@ -64,6 +64,7 @@ export function App({ core }: { core: HabitsCore }) {
         <EditScreen
           core={core}
           id={route.id}
+          numerical={route.numerical}
           onDone={() => {
             refresh();
             setRoute(route.id === null ? { screen: "list" } : { screen: "habit", id: route.id });

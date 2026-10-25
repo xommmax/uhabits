@@ -4,6 +4,7 @@ import { App } from "./App";
 import { startCore } from "./core";
 import { recordFirstUse } from "./backup";
 import { requestPersistence } from "./storage";
+import { applyDefaults } from "./prefs";
 import "./styles.css";
 
 const root = document.getElementById("app")!;
@@ -21,6 +22,7 @@ function showError(title: string, detail: unknown) {
 async function main() {
   registerSW({ immediate: true });
   recordFirstUse();
+  applyDefaults();
   void requestPersistence();
   // Charts draw text with these fonts, so they must be ready before the first draw.
   await Promise.all([document.fonts.load("12px NotoSans"), document.fonts.load("bold 12px NotoSansBold"), document.fonts.load("12px FontAwesome")]);

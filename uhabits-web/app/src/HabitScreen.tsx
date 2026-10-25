@@ -3,6 +3,7 @@ import type { HabitsCore } from "./core";
 import type { HabitDetail } from "./types";
 import { Chart, FA, Icon, Ring, Sheet, TopBar, useDarkMode } from "./components";
 import { shareCsv } from "./backup";
+import { EntryPopup, type PopupRequest } from "./popups";
 import { frequencyText, shortNumber } from "./format";
 
 // Spinner options, as in Android's res/values/constants.xml
@@ -38,6 +39,7 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
   const dark = useDarkMode();
   const [menuOpen, setMenuOpen] = useState(false);
   const [editingHistory, setEditingHistory] = useState(false);
+  const [popup, setPopup] = useState<PopupRequest | null>(null);
   const habit = core.habitDetail(id) as HabitDetail;
   const [scoreBucket, setScoreBucket] = useState(habit.scoreSpinner);
   const [barBucket, setBarBucket] = useState(habit.barSpinner);
@@ -46,6 +48,23 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
   const color = dark ? habit.colorDark : habit.colorLight;
   const titleStyle = { color };
   const diffStyle = (diff: number) => ({ color: diff >= 0 ? color : "var(--muted)" });
+
+  const showPopup = (day: number) =>
+    setPopup({
+      habitId: id,
+      day,
+      numerical: habit.numerical,
+      color,
+      atLeast: habit.targetType === 0,
+      x: window.innerWidth / 2,
+      y: window.innerHeight / 2,
+    });
+  const calendar = (canvas: HTMLCanvasElement, padding: number) => {
+    const chart = core.historyChart(canvas, id, dark, padding);
+    chart.setOnEdited(refresh);
+    chart.setOnPopup(showPopup);
+    return chart;
+  };
 
   const remove = () => {
     if (!confirm(`Delete "${habit.name}"? This cannot be undone.`)) return;
@@ -160,7 +179,7 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
             <h2 style={titleStyle}>Calendar</h2>
             <button class="card-action" onClick={() => setEditingHistory(true)}>Edit</button>
           </div>
-          <Chart height={CALENDAR_HEIGHT} deps={[id, rev, dark]} create={(c) => core.historyChart(c, id, dark, 0)} />
+          <Chart height={CALENDAR_HEIGHT} deps={[id, rev, dark]} create={(c) => calendar(c, 0)} />
         </section>
 
         {habit.streakCount > 0 && (
@@ -181,17 +200,15 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
           <div class="history-editor" onClick={(e) => e.stopPropagation()}>
             <Chart
               height={CALENDAR_EDITOR_HEIGHT}
-              deps={[id, dark]}
-              create={(c) => {
-                const chart = core.historyChart(c, id, dark, 10);
-                chart.setOnEdited(refresh);
-                return chart;
-              }}
+              deps={[id, rev, dark]}
+              create={(c) => calendar(c, 10)}
             />
             <button class="sheet-item bold" onClick={() => setEditingHistory(false)}>Done</button>
           </div>
         </div>
       )}
+
+      {popup && <EntryPopup core={core} request={popup} onClose={(changed) => { setPopup(null); if (changed) refresh(); }} />}
 
       {menuOpen && (
         <Sheet

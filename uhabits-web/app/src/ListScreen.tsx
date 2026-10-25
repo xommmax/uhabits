@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitRow } from "./types";
-import { CheckIcon, CrossIcon, Ring, Sheet, TopBar, useDarkMode } from "./components";
+import { Ring, Sheet, TopBar, useDarkMode } from "./components";
+import { celebrate, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
+import { getBool, Pref } from "./prefs";
 import { daysSinceBackup, pickBackupFile, shareBackup, shouldRemind, snoozeReminder } from "./backup";
-import { Entry, formatDay } from "./format";
+import { Entry, formatDay, shortNumber } from "./format";
 
 const COLUMN_WIDTH = 44;
 const NAME_MIN_WIDTH = 150;
@@ -38,7 +40,7 @@ interface Props {
   refresh: () => void;
   toast: (message: string) => void;
   onOpen: (id: number) => void;
-  onAdd: () => void;
+  onAdd: (numerical: boolean) => void;
 }
 
 export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) {
@@ -48,6 +50,8 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
   const [menuOpen, setMenuOpen] = useState(false);
   const [reordering, setReordering] = useState(false);
   const [remind, setRemind] = useState(shouldRemind);
+  const [popup, setPopup] = useState<PopupRequest | null>(null);
+  const [pickingType, setPickingType] = useState(false);
 
   const habits = core.listHabits(showArchived, columns) as HabitRow[];
   const today = core.today();
@@ -89,7 +93,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
             <button class="bar-button bold" onClick={() => setReordering(false)}>Done</button>
           ) : (
             <>
-              <button class="bar-button icon" aria-label="Add habit" onClick={onAdd}>＋</button>
+              <button class="bar-button icon" aria-label="Add habit" onClick={() => setPickingType(true)}>＋</button>
               <button class="bar-button icon" aria-label="Menu" onClick={() => setMenuOpen(true)}>⋯</button>
             </>
           )
@@ -109,7 +113,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
       {habits.length === 0 ? (
         <div class="empty">
           <p>You have no habits yet.</p>
-          <button class="primary-button" onClick={onAdd}>Add a habit</button>
+          <button class="primary-button" onClick={() => setPickingType(true)}>Add a habit</button>
         </div>
       ) : (
         <div class="habit-list">
@@ -128,11 +132,35 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
             <ReorderList habits={habits} dark={dark} onMove={(id, refId, before) => { core.move(id, refId, before); refresh(); }} />
           ) : (
             habits.map((h) => (
-              <HabitRowView key={h.id} habit={h} dark={dark} onOpen={() => onOpen(h.id)} onToggle={(i) => { core.toggle(h.id, today - i); refresh(); }} />
+              <HabitRowView
+                key={h.id}
+                habit={h}
+                dark={dark}
+                onOpen={() => onOpen(h.id)}
+                onToggle={(i, x, y) => {
+                  const value = core.toggle(h.id, today - i);
+                  if (value === Entry.YES_MANUAL) celebrate(dark ? h.colorDark : h.colorLight, x, y);
+                  refresh();
+                }}
+                onPopup={(i, x, y) =>
+                  setPopup({
+                    habitId: h.id,
+                    day: today - i,
+                    numerical: h.numerical,
+                    color: dark ? h.colorDark : h.colorLight,
+                    atLeast: h.targetType === 0,
+                    x,
+                    y,
+                  })
+                }
+              />
             ))
           )}
         </div>
       )}
+
+      {popup && <EntryPopup core={core} request={popup} onClose={(changed) => { setPopup(null); if (changed) refresh(); }} />}
+      {pickingType && <HabitTypePicker onClose={() => setPickingType(false)} onPick={(numerical) => { setPickingType(false); onAdd(numerical); }} />}
 
       {menuOpen && (
         <Sheet
@@ -150,7 +178,15 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
   );
 }
 
-function HabitRowView(props: { habit: HabitRow; dark: boolean; onOpen: () => void; onToggle: (daysAgo: number) => void }) {
+interface RowProps {
+  habit: HabitRow;
+  dark: boolean;
+  onOpen: () => void;
+  onToggle: (daysAgo: number, x: number, y: number) => void;
+  onPopup: (daysAgo: number, x: number, y: number) => void;
+}
+
+function HabitRowView(props: RowProps) {
   const { habit, dark } = props;
   const color = dark ? habit.colorDark : habit.colorLight;
   return (
@@ -160,26 +196,81 @@ function HabitRowView(props: { habit: HabitRow; dark: boolean; onOpen: () => voi
         <span style={{ color }}>{habit.name}</span>
       </button>
       {habit.values.map((value, i) => (
-        <button class="check" onClick={() => props.onToggle(i)} disabled={habit.numerical}>
-          <CheckCell value={value} color={color} numerical={habit.numerical} />
-        </button>
+        <CheckButton
+          habit={habit}
+          index={i}
+          value={value}
+          color={color}
+          onToggle={(x, y) => props.onToggle(i, x, y)}
+          onPopup={(x, y) => props.onPopup(i, x, y)}
+        />
       ))}
     </div>
   );
 }
 
-function CheckCell({ value, color, numerical }: { value: number; color: string; numerical: boolean }) {
-  if (numerical) return <span class="number">{value > 0 ? value / 1000 : ""}</span>;
+/** Android's CheckmarkButtonView / NumberButtonView, with the same tap and long-press rules. */
+function CheckButton(props: {
+  habit: HabitRow;
+  index: number;
+  value: number;
+  color: string;
+  onToggle: (x: number, y: number) => void;
+  onPopup: (x: number, y: number) => void;
+}) {
+  const { habit, value, color } = props;
+  const ref = useRef<HTMLButtonElement>(null);
+  const at = (fn: (x: number, y: number) => void) => () => {
+    const r = ref.current!.getBoundingClientRect();
+    fn(r.left + r.width / 2, r.top + r.height / 2);
+  };
+  const shortToggle = getBool(Pref.shortToggle);
+  const press = habit.numerical
+    ? usePress(at(props.onPopup), at(props.onPopup))
+    : usePress(at(shortToggle ? props.onToggle : props.onPopup), at(shortToggle ? props.onPopup : props.onToggle));
+  const hasNotes = habit.notes[props.index].trim() !== "";
+  return (
+    <button ref={ref} class="check" {...press}>
+      {habit.numerical ? (
+        <NumberCell value={value} completed={habit.completed[props.index]} unit={habit.unit} color={color} />
+      ) : (
+        <CheckCell value={value} color={color} />
+      )}
+      {hasNotes && <span class="notes-dot" style={{ background: color }} />}
+    </button>
+  );
+}
+
+function CheckCell({ value, color }: { value: number; color: string }) {
+  const questionMarks = getBool(Pref.questionMarks);
   switch (value) {
     case Entry.YES_MANUAL:
-      return <span style={{ color }}><CheckIcon /></span>;
+      return <span class="fa glyph" style={{ color }}>{GLYPH.check}</span>;
     case Entry.YES_AUTO:
-      return <span style={{ color, opacity: 0.4 }}><CheckIcon /></span>;
+      return <span class="fa glyph auto" style={{ WebkitTextStrokeColor: color }}>{GLYPH.check}</span>;
     case Entry.SKIP:
-      return <span style={{ color }}>»</span>;
+      return <span class="fa glyph" style={{ color }}>{GLYPH.skipped}</span>;
+    case Entry.NO:
+      return <span class={`fa glyph ${questionMarks ? "medium" : "low"}`}>{GLYPH.times}</span>;
     default:
-      return <span class="unchecked"><CrossIcon /></span>;
+      return questionMarks ? <span class="fa glyph question low">{GLYPH.question}</span> : <span class="fa glyph low">{GLYPH.times}</span>;
   }
+}
+
+function NumberCell(props: { value: number; completed: boolean; unit: string; color: string }) {
+  const { value, completed, unit } = props;
+  const style = { color: completed ? props.color : value < 0 ? "var(--contrast40)" : "var(--muted)" };
+  let label;
+  if (value === Entry.SKIP) label = <span class="fa">{GLYPH.skipped}</span>;
+  else if (value >= 0) label = shortNumber(value / 1000);
+  else if (getBool(Pref.questionMarks)) label = <span class="fa">{GLYPH.question}</span>;
+  else label = "0";
+  return (
+    <span class="number-cell" style={style}>
+      <span class="number">{label}</span>
+      {unit.trim() && <span class="unit">{unit}</span>}
+    </span>
+  );
 }
 
 /** Drag the ≡ handle to move a habit. */

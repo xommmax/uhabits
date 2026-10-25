@@ -19,6 +19,7 @@
   --text: #202020;
   --muted: #9e9e9e;
   --faint: #e0e0e0;
+  --contrast40: #d8d8d8;
   --separator: #e6e6e6;
   --accent: #007aff;
   --destructive: #ff3b30;
@@ -32,7 +33,8 @@
     --card: #303030;
     --text: #f2f2f2;
     --muted: #8e8e93;
-    --faint: #3a3a3c;
+    --faint: #424242;
+    --contrast40: #525252;
     --separator: #3d3d3d;
     --accent: #0a84ff;
     --destructive: #ff453a;
@@ -101,9 +103,20 @@ button:disabled { opacity: 0.35; cursor: default; }
 }
 .habit-name span { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
 .ring { flex: none; }
-.check { width: 44px; height: 56px; display: flex; align-items: center; justify-content: center; flex: none; }
-.unchecked { color: var(--faint); }
-.number { font-size: 14px; font-weight: 600; }
+.check {
+  position: relative; width: 44px; height: 56px; display: flex; align-items: center; justify-content: center; flex: none;
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+}
+/* Glyph sizes and colors from Android's CheckmarkButtonView */
+.glyph { font-size: 17px; }
+.glyph.auto { font-size: 16px; color: var(--card); -webkit-text-stroke: 1.5px; }
+.glyph.question { font-size: 15px; }
+.glyph.low { color: var(--contrast40); }
+.glyph.medium { color: var(--muted); }
+.number-cell { display: flex; flex-direction: column; align-items: center; line-height: 1.1; max-width: 42px; }
+.number { font-size: 14px; font-weight: 700; }
+.unit { font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40px; }
+.notes-dot { position: absolute; top: 7px; right: 7px; width: 5px; height: 5px; border-radius: 50%; }
 .habit-row.reorder { transition: transform 0.15s; }
 .habit-row.reorder.dragging { transition: none; z-index: 5; position: relative; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); }
 .drag-handle { padding: 0 18px; font-size: 24px; color: var(--muted); touch-action: none; align-self: stretch; display: flex; align-items: center; }
@@ -169,3 +182,26 @@ button:disabled { opacity: 0.35; cursor: default; }
   background: rgba(40, 40, 40, 0.92); color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 15px;
 }
 .fatal { padding: 48px 24px; }
+
+/* Check-in popups (Android's checkmark_popup.xml) */
+.entry-popup { width: 100%; max-width: 340px; background: var(--card); border-radius: 14px; padding: 12px; }
+.popup-notes {
+  width: 100%; min-height: 64px; border: 0; border-radius: 8px; padding: 10px; resize: none;
+  background: var(--bg); color: var(--text); font: inherit; font-size: 16px; outline: none;
+}
+.popup-buttons { display: flex; justify-content: space-around; align-items: center; margin-top: 8px; }
+.popup-glyph { font-size: 30px; padding: 10px 18px; }
+.muted-glyph { color: var(--muted); }
+.popup-number { display: flex; gap: 8px; margin-top: 8px; }
+.popup-number input {
+  flex: 1; min-width: 0; font: inherit; font-size: 22px; font-weight: 600; text-align: center;
+  border: 0; border-radius: 8px; padding: 8px; background: var(--bg); color: var(--text); outline: none;
+}
+.popup-save { font-weight: 600; padding: 0 16px; }
+.popup-text-button { color: var(--muted); padding: 10px 16px; }
+.type-picker { width: 100%; max-width: 360px; background: var(--card); border-radius: 14px; overflow: hidden; }
+.type-picker button { display: block; width: 100%; text-align: left; padding: 16px; border-bottom: 0.5px solid var(--separator); }
+.type-picker button:last-child { border-bottom: 0; }
+.type-title { font-weight: 600; margin-bottom: 4px; }
+.form-row select { font: inherit; border: 0; background: none; color: var(--accent); text-align: right; }
+.form-row input.wide { width: 50%; text-align: right; color: var(--text); }

@@ -40,6 +40,8 @@ import org.isoron.uhabits.core.io.StandardLogging
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.HabitType
+import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
 import org.isoron.uhabits.core.preferences.Preferences
@@ -125,7 +127,10 @@ class HabitsCore internal constructor(
             .map { habit ->
                 val row = habitSummary(habit)
                 row.score = habit.scores[today].value
-                row.values = Array(days) { habit.computedEntries.get(today.minus(it)).value }
+                val entries = Array(days) { habit.computedEntries.get(today.minus(it)) }
+                row.values = entries.map { it.value }.toTypedArray()
+                row.notes = entries.map { it.notes }.toTypedArray()
+                row.completed = entries.map { it.completed }.toTypedArray()
                 row
             }.toTypedArray()
     }
@@ -159,6 +164,12 @@ class HabitsCore internal constructor(
         model.description = form.description.unsafeCast<String>()
         model.color = PaletteColor(form.colorIndex.unsafeCast<Int>())
         model.frequency = Frequency(form.freqNum.unsafeCast<Int>(), form.freqDen.unsafeCast<Int>())
+        model.type = if (form.numerical.unsafeCast<Boolean>()) HabitType.NUMERICAL else HabitType.YES_NO
+        if (model.isNumerical) {
+            model.unit = form.unit.unsafeCast<String>()
+            model.targetValue = form.targetValue.unsafeCast<Double>()
+            model.targetType = NumericalHabitType.fromInt(form.targetType.unsafeCast<Int>())
+        }
         if (id != null) {
             execute(EditHabitCommand(habitList, id.toLong(), model))
             return id
@@ -180,6 +191,20 @@ class HabitsCore internal constructor(
         )
         execute(CreateRepetitionCommand(habitList, habit, date, next, entry.notes))
         return next
+    }
+
+    /** The computed check-in for [day]: value (thousandths for measurable habits) and notes. */
+    fun entry(id: Int, day: Int): dynamic {
+        val entry = habit(id).computedEntries.get(LocalDate(day))
+        val result: dynamic = js("{}")
+        result.value = entry.value
+        result.notes = entry.notes
+        return result
+    }
+
+    /** Stores a check-in, like the Android popups do (CreateRepetitionCommand). */
+    fun setEntry(id: Int, day: Int, value: Int, notes: String) {
+        execute(CreateRepetitionCommand(habitList, habit(id), LocalDate(day), value, notes))
     }
 
     fun archive(ids: Array<Int>) = execute(ArchiveHabitsCommand(habitList, ids.map(::habit)))

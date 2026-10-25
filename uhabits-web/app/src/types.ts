@@ -22,8 +22,10 @@ export interface HabitSummary {
 }
 
 export interface HabitRow extends HabitSummary {
-  /** Check-in values, index 0 = today. */
+  /** Check-in values, index 0 = today (thousandths for measurable habits). */
   values: number[];
+  notes: string[];
+  completed: boolean[];
 }
 
 export interface HabitDetail extends HabitSummary {
@@ -45,6 +47,10 @@ export interface HabitForm {
   colorIndex: number;
   freqNum: number;
   freqDen: number;
+  numerical: boolean;
+  unit: string;
+  targetValue: number;
+  targetType: number;
 }
 
-export type Route = { screen: "list" } | { screen: "habit"; id: number } | { screen: "edit"; id: number | null };
+export type Route = { screen: "list" } | { screen: "habit"; id: number } | { screen: "edit"; id: number | null; numerical: boolean };
