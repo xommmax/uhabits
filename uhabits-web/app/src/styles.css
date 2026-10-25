@@ -151,7 +151,7 @@ button:disabled { opacity: 0.35; cursor: default; }
 .sheet-item.destructive { color: var(--destructive); }
 .sheet-item.bold { font-weight: 600; }
 .sheet-check { position: absolute; right: 20px; }
-.sheet-footer { text-align: center; font-size: 13px; color: var(--muted); padding: 12px; }
+.sheet-footer { text-align: center; font-size: 13px; color: var(--muted); padding: 12px; white-space: pre-line; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(32px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30;

@@ -1,3 +1,5 @@
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import preact from "@preact/preset-vite";
 import { defineConfig } from "vite";
@@ -5,7 +7,15 @@ import { VitePWA } from "vite-plugin-pwa";
 
 const path = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 
+// Shown in the app menu, so you can tell which build is installed.
+const buildInfo = {
+  version: JSON.parse(readFileSync(path("package.json"), "utf8")).version as string,
+  commit: (process.env.GITHUB_SHA ?? execSync("git rev-parse HEAD").toString()).trim().slice(0, 7),
+  time: new Date().toISOString(),
+};
+
 export default defineConfig({
+  define: { __BUILD_INFO__: JSON.stringify(buildInfo) },
   // GitHub Pages serves the app from /<repo>/; set BASE_PATH there.
   base: process.env.BASE_PATH ?? "/",
   plugins: [

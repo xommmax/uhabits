@@ -26,6 +26,12 @@ function lastBackupText(): string {
   return `Last backup: ${days} day${days === 1 ? "" : "s"} ago`;
 }
 
+function versionText(): string {
+  const { version, commit, time } = __BUILD_INFO__;
+  const built = new Date(time).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
+  return `Version ${version} (${commit}) · built ${built}`;
+}
+
 interface Props {
   core: HabitsCore;
   rev: number;
@@ -131,7 +137,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
       {menuOpen && (
         <Sheet
           onClose={() => setMenuOpen(false)}
-          footer={lastBackupText()}
+          footer={`${lastBackupText()}\n${versionText()}`}
           items={[
             { label: "Show archived", checked: showArchived, onClick: toggleArchived },
             { label: "Reorder habits", onClick: () => setReordering(true) },
