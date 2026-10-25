@@ -43,12 +43,10 @@ function backupFileName(): string {
 }
 
 /**
- * Opens the iOS share sheet with an Android-compatible backup.
- * Returns false if the user cancelled.
+ * Opens the iOS share sheet with [file] (or downloads it where sharing files is
+ * unsupported). Returns false if the user cancelled.
  */
-export async function shareBackup(core: HabitsCore): Promise<boolean> {
-  const bytes = core.exportBackup() as Uint8Array<ArrayBuffer>;
-  const file = new File([bytes], backupFileName(), { type: "application/octet-stream" });
+export async function shareFile(file: File): Promise<boolean> {
   if (navigator.canShare?.({ files: [file] })) {
     try {
       await navigator.share({ files: [file] });
@@ -63,9 +61,26 @@ export async function shareBackup(core: HabitsCore): Promise<boolean> {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 10_000);
   }
+  return true;
+}
+
+/** Shares an Android-compatible backup. Returns false if the user cancelled. */
+export async function shareBackup(core: HabitsCore): Promise<boolean> {
+  const bytes = core.exportBackup() as Uint8Array<ArrayBuffer>;
+  const file = new File([bytes], backupFileName(), { type: "application/octet-stream" });
+  if (!(await shareFile(file))) return false;
   localStorage.setItem(LAST_BACKUP, String(Date.now()));
   localStorage.removeItem(SNOOZE_UNTIL);
   return true;
+}
+
+/** Shares a zip of CSV files, named like Android's "Loop Habits CSV yyyy-MM-dd.zip". */
+export async function shareCsv(core: HabitsCore, ids: number[]): Promise<boolean> {
+  const bytes = (await core.exportCsv(ids)) as Uint8Array<ArrayBuffer>;
+  const d = new Date();
+  const p = (n: number) => String(n).padStart(2, "0");
+  const name = `Loop Habits CSV ${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}.zip`;
+  return shareFile(new File([bytes], name, { type: "application/zip" }));
 }
 
 /** Lets the user pick a backup file and merges it into the current habits. */

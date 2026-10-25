@@ -13,20 +13,32 @@ export function useDarkMode(): boolean {
   return dark;
 }
 
-export function Ring({ value, color, size = 24 }: { value: number; color: string; size?: number }) {
-  const r = 40;
+/** Score ring like Android's RingView: grey track, colored arc from 12 o'clock. */
+export function Ring({ value, color, size = 24, thickness = 4 }: { value: number; color: string; size?: number; thickness?: number }) {
+  const r = (size - thickness) / 2;
   const c = 2 * Math.PI * r;
   return (
-    <svg class="ring" width={size} height={size} viewBox="0 0 100 100">
-      <circle cx="50" cy="50" r={r} fill="none" stroke={color} stroke-opacity="0.2" stroke-width="20" />
+    <svg class="ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--faint)" stroke-width={thickness} />
       <circle
-        cx="50" cy="50" r={r} fill="none" stroke={color} stroke-width="20"
+        cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} stroke-width={thickness}
         stroke-dasharray={`${c * Math.min(1, Math.max(0, value))} ${c}`}
-        transform="rotate(-90 50 50)"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
       />
     </svg>
   );
 }
+
+/** Glyphs from FontAwesome 4 (the icon font Android uses), see res/values/fontawesome.xml. */
+export const FA = {
+  calendar: "\uf073",
+  bell: "\uf0f3",
+  tag: "\uf02b",
+  arrowUp: "\uf0aa",
+  arrowDown: "\uf0ab",
+} as const;
+
+export const Icon = ({ glyph }: { glyph: string }) => <span class="fa">{glyph}</span>;
 
 export const CheckIcon = () => (
   <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" /></svg>
@@ -109,7 +121,7 @@ export function Chart(props: { create: (canvas: HTMLCanvasElement) => ChartHandl
   const onPointerMove = (e: PointerEvent) => {
     const d = drag.current;
     const handle = handleRef.current;
-    if (!d.active || !handle) return;
+    if (!d.active || !handle || handle.columnWidth <= 0) return;
     const dx = e.clientX - d.startX;
     if (Math.abs(dx) > TAP_SLOP_PX) d.moved = true;
     const columns = Math.round(dx / handle.columnWidth);

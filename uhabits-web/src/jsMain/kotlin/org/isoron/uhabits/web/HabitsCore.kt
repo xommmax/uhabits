@@ -34,6 +34,7 @@ import org.isoron.uhabits.core.commands.EditHabitCommand
 import org.isoron.uhabits.core.commands.ReorderHabitCommand
 import org.isoron.uhabits.core.commands.ReorderTarget
 import org.isoron.uhabits.core.commands.UnarchiveHabitsCommand
+import org.isoron.uhabits.core.io.HabitsCSVExporter
 import org.isoron.uhabits.core.io.LoopDBImporter
 import org.isoron.uhabits.core.io.StandardLogging
 import org.isoron.uhabits.core.models.Entry
@@ -44,10 +45,11 @@ import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.tasks.CoroutineTaskRunner
 import org.isoron.uhabits.core.ui.screens.habits.show.views.OverviewCardPresenter
-import org.isoron.uhabits.core.ui.screens.habits.show.views.StreakCartPresenter
+import org.isoron.uhabits.core.ui.screens.habits.show.views.TargetCardPresenter
 import org.isoron.uhabits.core.ui.views.DarkTheme
 import org.isoron.uhabits.core.ui.views.LightTheme
 import org.khronos.webgl.Uint8Array
+import org.w3c.dom.HTMLCanvasElement
 import kotlin.js.Promise
 import kotlin.math.roundToInt
 
@@ -136,13 +138,14 @@ class HabitsCore internal constructor(
         result.scoreMonthDiff = overview.scoreMonthDiff.toDouble()
         result.scoreYearDiff = overview.scoreYearDiff.toDouble()
         result.totalCount = overview.totalCount.toInt()
-        result.streaks = StreakCartPresenter.buildState(habit, lightTheme).bestStreaks.map {
-            val streak: dynamic = js("{}")
-            streak.start = it.start.daysSince2000
-            streak.end = it.end.daysSince2000
-            streak.length = it.length
-            streak
-        }.toTypedArray()
+        result.streakCount = habit.streaks.getBest(10).size
+        result.targetRows = TargetCardPresenter.buildState(habit, preferences.firstWeekdayInt, lightTheme).intervals.size
+        result.scoreSpinner = preferences.scoreCardSpinnerPosition
+        result.barSpinner = if (habit.isNumerical) {
+            preferences.barCardNumericalSpinnerPosition
+        } else {
+            preferences.barCardBoolSpinnerPosition
+        }
         return result
     }
 
@@ -193,12 +196,38 @@ class HabitsCore internal constructor(
         execute(ReorderHabitCommand(habitList, habit, target, habit.category))
     }
 
-    fun historyChart(canvas: org.w3c.dom.HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
-        buildHistoryChart(canvas, habit(id), habitList, preferences, theme(dark)) { execute(it) }
+    fun historyChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean, padding: Double): ChartHandle =
+        buildHistoryChart(canvas, habit(id), habitList, preferences, theme(dark), padding) { execute(it) }
 
-    fun barChart(canvas: org.w3c.dom.HTMLCanvasElement, id: Int, dark: Boolean, bucket: Int): ChartHandle {
-        preferences.barCardBoolSpinnerPosition = bucket
-        return buildBarChart(canvas, habit(id), preferences, theme(dark))
+    /** [bucket] is the position in Android's bar card spinner (Week..Year, or Day..Year if numerical). */
+    fun barChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean, bucket: Int): ChartHandle {
+        val habit = habit(id)
+        if (habit.isNumerical) {
+            preferences.barCardNumericalSpinnerPosition = bucket
+        } else {
+            preferences.barCardBoolSpinnerPosition = bucket
+        }
+        return buildBarChart(canvas, habit, preferences, theme(dark))
+    }
+
+    /** [bucket] is the position in Android's score card spinner (Day, Week, Month, Quarter, Year). */
+    fun scoreChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean, bucket: Int): ChartHandle {
+        preferences.scoreCardSpinnerPosition = bucket
+        return buildScoreChart(canvas, habit(id), preferences, theme(dark), dark)
+    }
+
+    fun frequencyChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
+        buildFrequencyChart(canvas, habit(id), preferences, theme(dark), dark)
+
+    fun streakChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
+        buildStreakChart(canvas, habit(id), theme(dark), dark)
+
+    fun targetChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
+        buildTargetChart(canvas, habit(id), preferences, theme(dark), dark)
+
+    /** Zip of CSV files for the given habits, same as Android's "Export" (HabitsCSVExporter). */
+    fun exportCsv(ids: Array<Int>): Promise<Uint8Array> = GlobalScope.promise {
+        HabitsCSVExporter(habitList, ids.map(::habit)).writeArchive().toUint8Array()
     }
 
     /** Raw copy of the live database, used to persist it in the browser. */
@@ -267,6 +296,10 @@ class HabitsCore internal constructor(
         result.unit = habit.unit
         result.freqNum = habit.frequency.numerator
         result.freqDen = habit.frequency.denominator
+        result.category = habit.category
+        result.targetValue = habit.targetValue
+        result.targetType = habit.targetType.value
+        result.hasReminder = habit.hasReminder()
         return result
     }
 }

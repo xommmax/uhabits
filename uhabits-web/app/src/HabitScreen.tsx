@@ -1,36 +1,64 @@
 import { useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitDetail } from "./types";
-import { Chart, Ring, Sheet, TopBar, useDarkMode } from "./components";
-import { formatDay, frequencyText, percent, signedPercent } from "./format";
+import { Chart, FA, Icon, Ring, Sheet, TopBar, useDarkMode } from "./components";
+import { shareCsv } from "./backup";
+import { frequencyText, shortNumber } from "./format";
 
-const BAR_BUCKETS = ["Week", "Month", "Quarter", "Year"];
+// Spinner options, as in Android's res/values/constants.xml
+const SCORE_BUCKETS = ["Day", "Week", "Month", "Quarter", "Year"];
+const BAR_BUCKETS_BOOLEAN = ["Week", "Month", "Quarter", "Year"];
+const BAR_BUCKETS_NUMERICAL = ["Day", "Week", "Month", "Quarter", "Year"];
+
+// Chart heights from Android's show_habit_*.xml layouts (dp)
+const SCORE_HEIGHT = 220;
+const BAR_HEIGHT = 220;
+const CALENDAR_HEIGHT = 160;
+const CALENDAR_EDITOR_HEIGHT = 350;
+const FREQUENCY_HEIGHT = 200;
+const ROW_HEIGHT = 20;
+
 const EDGE_SWIPE_START_PX = 24;
 const EDGE_SWIPE_DISTANCE_PX = 80;
+
+/** Like Android's OverviewCardView.formatPercentageDiff. */
+const percentageDiff = (diff: number) => `${diff >= 0 ? "+" : "−"}${Math.round(Math.abs(diff) * 100)}%`;
 
 interface Props {
   core: HabitsCore;
   id: number;
   rev: number;
   refresh: () => void;
+  toast: (message: string) => void;
   onBack: () => void;
   onEdit: () => void;
 }
 
-export function HabitScreen({ core, id, rev, refresh, onBack, onEdit }: Props) {
+export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: Props) {
   const dark = useDarkMode();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [bucket, setBucket] = useState(() => Number(localStorage.getItem("pref:pref_bar_card_bool_spinner") ?? 0));
+  const [editingHistory, setEditingHistory] = useState(false);
+  const habit = core.habitDetail(id) as HabitDetail;
+  const [scoreBucket, setScoreBucket] = useState(habit.scoreSpinner);
+  const [barBucket, setBarBucket] = useState(habit.barSpinner);
   const swipe = useRef<number | null>(null);
 
-  const habit = core.habitDetail(id) as HabitDetail;
   const color = dark ? habit.colorDark : habit.colorLight;
-  const best = Math.max(1, ...habit.streaks.map((s) => s.length));
+  const titleStyle = { color };
+  const diffStyle = (diff: number) => ({ color: diff >= 0 ? color : "var(--muted)" });
 
   const remove = () => {
     if (!confirm(`Delete "${habit.name}"? This cannot be undone.`)) return;
     core.delete([id]);
     onBack();
+  };
+
+  const exportCsv = async () => {
+    try {
+      await shareCsv(core, [id]);
+    } catch {
+      toast("Could not export. Please try again.");
+    }
   };
 
   return (
@@ -56,85 +84,120 @@ export function HabitScreen({ core, id, rev, refresh, onBack, onEdit }: Props) {
 
       <div class="cards">
         <section class="card subtitle">
-          {habit.question && <div class="question">{habit.question}</div>}
-          <div class="muted">
-            {frequencyText(habit.freqNum, habit.freqDen)}
-            {habit.archived && " · Archived"}
+          {habit.question && <div class="question" style={titleStyle}>{habit.question}</div>}
+          <div class="subtitle-row">
+            <span><Icon glyph={FA.calendar} /> {frequencyText(habit.freqNum, habit.freqDen)}</span>
+            {habit.numerical && (
+              <span>
+                <Icon glyph={habit.targetType === 0 ? FA.arrowUp : FA.arrowDown} /> {shortNumber(habit.targetValue)} {habit.unit}
+              </span>
+            )}
+            {habit.category.trim() && <span><Icon glyph={FA.tag} /> {habit.category}</span>}
           </div>
+          {habit.archived && <div class="muted">Archived</div>}
         </section>
 
-        <section class="card">
-          <h2 style={{ color }}>Overview</h2>
-          <div class="overview">
-            <div class="overview-item">
-              <Ring value={habit.score} color={color} size={44} />
-              <div class="overview-value" style={{ color }}>{percent(habit.score)}</div>
-              <div class="muted">Score</div>
+        {habit.description && (
+          <section class="card">
+            <p class="notes">{habit.description}</p>
+          </section>
+        )}
+
+        {habit.numerical ? (
+          <section class="card">
+            <h2 style={titleStyle}>Target</h2>
+            <Chart height={habit.targetRows * ROW_HEIGHT} deps={[id, rev, dark]} create={(c) => core.targetChart(c, id, dark)} />
+          </section>
+        ) : (
+          <section class="card">
+            <h2 style={titleStyle}>Overview</h2>
+            <div class="overview">
+              <div class="overview-item ring-item">
+                <Ring value={habit.score} color={color} size={30} thickness={5} />
+                <div>
+                  <div class="overview-value" style={titleStyle}>{Math.round(habit.score * 100)}%</div>
+                  <div class="muted">Score</div>
+                </div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-value" style={diffStyle(habit.scoreMonthDiff)}>{percentageDiff(habit.scoreMonthDiff)}</div>
+                <div class="muted">Month</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-value" style={diffStyle(habit.scoreYearDiff)}>{percentageDiff(habit.scoreYearDiff)}</div>
+                <div class="muted">Year</div>
+              </div>
+              <div class="overview-item">
+                <div class="overview-value" style={titleStyle}>{habit.totalCount}</div>
+                <div class="muted">Total</div>
+              </div>
             </div>
-            <div class="overview-item">
-              <div class="overview-value" style={{ color }}>{signedPercent(habit.scoreMonthDiff)}</div>
-              <div class="muted">Month</div>
-            </div>
-            <div class="overview-item">
-              <div class="overview-value" style={{ color }}>{signedPercent(habit.scoreYearDiff)}</div>
-              <div class="muted">Year</div>
-            </div>
-            <div class="overview-item">
-              <div class="overview-value" style={{ color }}>{habit.totalCount}</div>
-              <div class="muted">Total</div>
-            </div>
-          </div>
-        </section>
+          </section>
+        )}
 
         <section class="card">
-          <h2 style={{ color }}>Calendar</h2>
-          <Chart
-            height={180}
-            deps={[id, rev, dark]}
-            create={(canvas) => {
-              const chart = core.historyChart(canvas, id, dark);
-              chart.setOnEdited(refresh);
-              return chart;
-            }}
-          />
-          <div class="hint">Tap a day to check or uncheck it. Swipe sideways to see older days.</div>
+          <div class="card-header">
+            <h2 style={titleStyle}>Score</h2>
+            <select value={scoreBucket} onChange={(e) => setScoreBucket(Number(e.currentTarget.value))}>
+              {SCORE_BUCKETS.map((label, i) => <option value={i}>{label}</option>)}
+            </select>
+          </div>
+          <Chart height={SCORE_HEIGHT} deps={[id, rev, dark, scoreBucket]} create={(c) => core.scoreChart(c, id, dark, scoreBucket)} />
         </section>
 
         <section class="card">
           <div class="card-header">
-            <h2 style={{ color }}>History</h2>
-            <select value={bucket} onChange={(e) => setBucket(Number(e.currentTarget.value))}>
-              {BAR_BUCKETS.map((label, i) => <option value={i}>{label}</option>)}
+            <h2 style={titleStyle}>History</h2>
+            <select value={barBucket} onChange={(e) => setBarBucket(Number(e.currentTarget.value))}>
+              {(habit.numerical ? BAR_BUCKETS_NUMERICAL : BAR_BUCKETS_BOOLEAN).map((label, i) => <option value={i}>{label}</option>)}
             </select>
           </div>
-          <Chart height={200} deps={[id, rev, dark, bucket]} create={(canvas) => core.barChart(canvas, id, dark, bucket)} />
+          <Chart height={BAR_HEIGHT} deps={[id, rev, dark, barBucket]} create={(c) => core.barChart(c, id, dark, barBucket)} />
         </section>
 
-        {habit.streaks.length > 0 && (
+        <section class="card">
+          <div class="card-header">
+            <h2 style={titleStyle}>Calendar</h2>
+            <button class="card-action" onClick={() => setEditingHistory(true)}>Edit</button>
+          </div>
+          <Chart height={CALENDAR_HEIGHT} deps={[id, rev, dark]} create={(c) => core.historyChart(c, id, dark, 0)} />
+        </section>
+
+        {habit.streakCount > 0 && (
           <section class="card">
-            <h2 style={{ color }}>Best streaks</h2>
-            {habit.streaks.map((s) => (
-              <div class="streak">
-                <span class="muted">{formatDay(s.start, { month: "short", day: "numeric", year: "numeric" })}</span>
-                <div class="streak-bar" style={{ width: `${(s.length / best) * 100}%`, background: color }}>{s.length}</div>
-                <span class="muted">{formatDay(s.end, { month: "short", day: "numeric", year: "numeric" })}</span>
-              </div>
-            ))}
+            <h2 style={titleStyle}>Best streaks</h2>
+            <Chart height={habit.streakCount * ROW_HEIGHT} deps={[id, rev, dark]} create={(c) => core.streakChart(c, id, dark)} />
           </section>
         )}
 
-        {habit.description && (
-          <section class="card">
-            <h2 style={{ color }}>Notes</h2>
-            <p class="notes">{habit.description}</p>
-          </section>
-        )}
+        <section class="card">
+          <h2 style={titleStyle}>Frequency</h2>
+          <Chart height={FREQUENCY_HEIGHT} deps={[id, rev, dark]} create={(c) => core.frequencyChart(c, id, dark)} />
+        </section>
       </div>
+
+      {editingHistory && (
+        <div class="overlay center" onClick={() => setEditingHistory(false)}>
+          <div class="history-editor" onClick={(e) => e.stopPropagation()}>
+            <Chart
+              height={CALENDAR_EDITOR_HEIGHT}
+              deps={[id, dark]}
+              create={(c) => {
+                const chart = core.historyChart(c, id, dark, 10);
+                chart.setOnEdited(refresh);
+                return chart;
+              }}
+            />
+            <button class="sheet-item bold" onClick={() => setEditingHistory(false)}>Done</button>
+          </div>
+        </div>
+      )}
 
       {menuOpen && (
         <Sheet
           onClose={() => setMenuOpen(false)}
           items={[
+            { label: "Export", onClick: exportCsv },
             habit.archived
               ? { label: "Unarchive", onClick: () => { core.unarchive([id]); refresh(); } }
               : { label: "Archive", onClick: () => { core.archive([id]); onBack(); } },

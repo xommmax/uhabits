@@ -53,6 +53,7 @@ export function App({ core }: { core: HabitsCore }) {
           id={route.id}
           rev={rev}
           refresh={refresh}
+          toast={toast}
           onBack={() => setRoute({ screen: "list" })}
           onEdit={() => setRoute({ screen: "edit", id: route.id })}
         />

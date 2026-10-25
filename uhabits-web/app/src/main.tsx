@@ -23,7 +23,7 @@ async function main() {
   recordFirstUse();
   void requestPersistence();
   // Charts draw text with these fonts, so they must be ready before the first draw.
-  await Promise.all([document.fonts.load("12px NotoSans"), document.fonts.load("bold 12px NotoSansBold")]);
+  await Promise.all([document.fonts.load("12px NotoSans"), document.fonts.load("bold 12px NotoSansBold"), document.fonts.load("12px FontAwesome")]);
   const core = await startCore((e) => alert(`Your last change could not be saved (${e}). Please back up your habits.`));
   render(<App core={core} />, root);
 }

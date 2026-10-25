@@ -13,6 +13,11 @@ export interface HabitSummary {
   unit: string;
   freqNum: number;
   freqDen: number;
+  category: string;
+  targetValue: number;
+  /** 0 = at least, 1 = at most (core's NumericalHabitType). */
+  targetType: number;
+  hasReminder: boolean;
   score: number;
 }
 
@@ -21,17 +26,15 @@ export interface HabitRow extends HabitSummary {
   values: number[];
 }
 
-export interface Streak {
-  start: number;
-  end: number;
-  length: number;
-}
-
 export interface HabitDetail extends HabitSummary {
   scoreMonthDiff: number;
   scoreYearDiff: number;
   totalCount: number;
-  streaks: Streak[];
+  streakCount: number;
+  targetRows: number;
+  /** Positions in Android's spinners, remembered in preferences. */
+  scoreSpinner: number;
+  barSpinner: number;
 }
 
 export interface HabitForm {

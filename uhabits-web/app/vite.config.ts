@@ -44,7 +44,7 @@ export default defineConfig({
   resolve: {
     alias: { "habits-core": path("../build/dist/js/productionLibrary/habits-core.mjs") },
     // The Kotlin output lives outside this folder; resolve its npm imports from here.
-    dedupe: ["sprintf-js"],
+    dedupe: ["sprintf-js", "jszip"],
   },
   server: {
     fs: { allow: [path("../.."), path(".")] },

@@ -11,6 +11,7 @@ package org.isoron.uhabits.web
 import kotlinx.browser.window
 import org.isoron.platform.gui.DataView
 import org.isoron.platform.gui.JsCanvas
+import org.isoron.platform.gui.View
 import org.isoron.platform.time.JsLocalDateFormatter
 import org.isoron.platform.time.LocalDate
 import org.isoron.uhabits.core.commands.Command
@@ -20,6 +21,10 @@ import org.isoron.uhabits.core.models.Habit
 import org.isoron.uhabits.core.models.HabitList
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.ui.screens.habits.show.views.BarCardPresenter
+import org.isoron.uhabits.core.ui.screens.habits.show.views.FrequencyCardPresenter
+import org.isoron.uhabits.core.ui.screens.habits.show.views.ScoreCardPresenter
+import org.isoron.uhabits.core.ui.screens.habits.show.views.StreakCartPresenter
+import org.isoron.uhabits.core.ui.screens.habits.show.views.TargetCardPresenter
 import org.isoron.uhabits.core.ui.screens.habits.show.views.HistoryCardPresenter
 import org.isoron.uhabits.core.ui.views.BarChart
 import org.isoron.uhabits.core.ui.views.HistoryChart
@@ -35,7 +40,7 @@ private val dateFormatter = JsLocalDateFormatter("en-US")
 @JsExport
 class ChartHandle internal constructor(
     private val canvas: HTMLCanvasElement,
-    internal val view: DataView
+    internal val view: View
 ) {
     private var onEdited: () -> Unit = {}
 
@@ -44,9 +49,9 @@ class ChartHandle internal constructor(
         onEdited = callback
     }
 
-    /** Width of one scrollable column, available after the first [draw]. */
+    /** Width of one scrollable column, available after the first [draw]; 0 if the chart does not scroll. */
     val columnWidth: Double
-        get() = view.dataColumnWidth
+        get() = (view as? DataView)?.dataColumnWidth ?: 0.0
 
     fun draw() {
         val scale = window.devicePixelRatio
@@ -57,6 +62,7 @@ class ChartHandle internal constructor(
 
     /** Scrolls back in time by [columns] (negative scrolls forward). Returns true if the view moved. */
     fun scrollBy(columns: Int): Boolean {
+        val view = view as? DataView ?: return false
         val offset = max(0, view.dataOffset + columns)
         if (offset == view.dataOffset) return false
         view.dataOffset = offset
@@ -75,6 +81,7 @@ internal fun buildHistoryChart(
     habitList: HabitList,
     preferences: Preferences,
     theme: Theme,
+    padding: Double,
     execute: (Command) -> Unit
 ): ChartHandle {
     val state = HistoryCardPresenter.buildState(habit, preferences.firstWeekday, theme)
@@ -86,11 +93,13 @@ internal fun buildHistoryChart(
         series = state.series,
         defaultSquare = state.defaultSquare,
         notesIndicators = state.notesIndicators,
-        firstWeekday = state.firstWeekday
+        firstWeekday = state.firstWeekday,
+        padding = padding
     )
     val handle = ChartHandle(canvas, chart)
     chart.onDateClickedListener = object : OnDateClickedListener {
         override fun onDateShortPress(date: LocalDate) {
+            if (habit.isNumerical) return
             val entry = habit.computedEntries.get(date)
             val next = Entry.nextToggleValue(
                 value = entry.value,
@@ -126,5 +135,73 @@ internal fun buildBarChart(
         colors = mutableListOf(theme.color(state.color.paletteIndex))
         axis = state.entries.map { it.date }
     }
+    return ChartHandle(canvas, chart)
+}
+
+internal fun buildScoreChart(
+    canvas: HTMLCanvasElement,
+    habit: Habit,
+    preferences: Preferences,
+    theme: Theme,
+    dark: Boolean
+): ChartHandle {
+    val state = ScoreCardPresenter.buildState(
+        habit = habit,
+        firstWeekday = preferences.firstWeekdayInt,
+        spinnerPosition = preferences.scoreCardSpinnerPosition,
+        theme = theme
+    )
+    val chart = ScoreChart(state.scores, state.bucketSize, theme.color(habit.color), ChartPalette(dark), dateFormatter)
+    return ChartHandle(canvas, chart)
+}
+
+internal fun buildFrequencyChart(
+    canvas: HTMLCanvasElement,
+    habit: Habit,
+    preferences: Preferences,
+    theme: Theme,
+    dark: Boolean
+): ChartHandle {
+    val state = FrequencyCardPresenter.buildState(habit, preferences.firstWeekday, theme)
+    val chart = FrequencyChart(
+        state.frequency,
+        state.isNumerical,
+        state.firstWeekday,
+        theme.color(habit.color),
+        ChartPalette(dark),
+        dateFormatter
+    )
+    return ChartHandle(canvas, chart)
+}
+
+internal fun buildStreakChart(canvas: HTMLCanvasElement, habit: Habit, theme: Theme, dark: Boolean): ChartHandle {
+    val state = StreakCartPresenter.buildState(habit, theme)
+    return ChartHandle(canvas, StreakChart(state.bestStreaks, theme.color(habit.color), ChartPalette(dark)))
+}
+
+/** Same labels as Android's TargetCardView.intervalToLabel. */
+private fun intervalToLabel(interval: Int) = when (interval) {
+    1 -> "Today"
+    7 -> "Week"
+    30 -> "Month"
+    91 -> "Quarter"
+    else -> "Year"
+}
+
+internal fun buildTargetChart(
+    canvas: HTMLCanvasElement,
+    habit: Habit,
+    preferences: Preferences,
+    theme: Theme,
+    dark: Boolean
+): ChartHandle {
+    val state = TargetCardPresenter.buildState(habit, preferences.firstWeekdayInt, theme)
+    val chart = TargetChart(
+        state.intervals.map(::intervalToLabel),
+        state.values,
+        state.targets,
+        theme.color(habit.color),
+        ChartPalette(dark)
+    )
     return ChartHandle(canvas, chart)
 }
