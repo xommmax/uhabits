@@ -1,0 +1,25 @@
+{
+  "name": "loop-habits-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "license": "GPL-3.0-or-later",
+  "scripts": {
+    "core": "cd ../.. && ./gradlew :uhabits-web:jsBrowserProductionLibraryDistribution",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "preact": "10.29.8",
+    "sprintf-js": "1.1.3",
+    "sql.js": "1.11.0"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "2.10.6",
+    "@types/sql.js": "1.4.9",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vite-plugin-pwa": "1.3.0"
+  }
+}

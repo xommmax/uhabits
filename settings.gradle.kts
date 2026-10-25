@@ -30,3 +30,4 @@ dependencyResolutionManagement {
 }
 
 include(":uhabits-android", ":uhabits-core")
+include(":uhabits-web")
