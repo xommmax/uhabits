@@ -5,6 +5,8 @@ import { ListScreen } from "./ListScreen";
 import { HabitScreen } from "./HabitScreen";
 import { EditScreen } from "./EditScreen";
 import { Intro } from "./Intro";
+import { SettingsScreen } from "./SettingsScreen";
+import { AboutScreen } from "./AboutScreen";
 
 const TOAST_MS = 2500;
 const CLOCK_CHECK_MS = 60_000;
@@ -46,6 +48,8 @@ export function App({ core }: { core: HabitsCore }) {
           onOpen={(id) => setRoute({ screen: "habit", id })}
           onAdd={(numerical) => setRoute({ screen: "edit", id: null, numerical })}
           onEdit={(id) => setRoute({ screen: "edit", id, numerical: false })}
+          onSettings={() => setRoute({ screen: "settings" })}
+          onAbout={() => setRoute({ screen: "about" })}
         />
       );
       break;
@@ -75,6 +79,20 @@ export function App({ core }: { core: HabitsCore }) {
         />
       );
       break;
+  }
+
+  if (route.screen === "settings") {
+    screen = (
+      <SettingsScreen
+        core={core}
+        refresh={refresh}
+        toast={toast}
+        onBack={() => setRoute({ screen: "list" })}
+        onAbout={() => setRoute({ screen: "about" })}
+      />
+    );
+  } else if (route.screen === "about") {
+    screen = <AboutScreen onBack={() => setRoute({ screen: "settings" })} />;
   }
 
   return (

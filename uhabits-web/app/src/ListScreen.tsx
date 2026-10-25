@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitRow } from "./types";
 import { FA, Icon, Ring, Sheet, type SheetItem, TopBar, useDarkMode } from "./components";
-import { daysSinceBackup, pickBackupFile, shareBackup, shouldRemind, snoozeReminder } from "./backup";
+import { daysSinceBackup, shareBackup, shouldRemind, snoozeReminder } from "./backup";
 import { Entry, formatDay, PALETTE, shortNumber } from "./format";
 import { celebrate, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
 import { getBool, Pref } from "./prefs";
@@ -58,6 +58,8 @@ interface Props {
   onOpen: (id: number) => void;
   onAdd: (numerical: boolean) => void;
   onEdit: (id: number) => void;
+  onSettings: () => void;
+  onAbout: () => void;
 }
 
 type Dialog =
@@ -69,7 +71,7 @@ type Dialog =
   | { kind: "type" }
   | null;
 
-export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit }: Props) {
+export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, onSettings, onAbout }: Props) {
   const dark = useDarkMode();
   const columns = useDayColumns();
   const [query, setQuery] = useState<string | null>(null);
@@ -142,16 +144,6 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit }:
       }
     } catch {
       toast("Could not create the backup");
-    }
-  };
-  const restore = async () => {
-    const data = await pickBackupFile();
-    if (!data) return;
-    if (await core.importBackup(data)) {
-      refresh();
-      toast("Backup imported");
-    } else {
-      toast("This file is not a Loop backup");
     }
   };
   const ids = () => [...selected];
@@ -271,9 +263,9 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit }:
     { label: "Filter", onClick: () => setDialog({ kind: "filter" }) },
     { label: "Sort", onClick: () => setDialog({ kind: "sort" }) },
     { label: "Dark theme", checked: isNightMode(), onClick: toggleNightMode },
-    { label: "Back up now", onClick: backUp },
-    { label: "Restore from backup", onClick: restore },
+    { label: "Settings", onClick: onSettings },
     { label: "Help & FAQ", onClick: () => window.open(HELP_URL, "_blank") },
+    { label: "About", onClick: onAbout },
   ];
 
   return (

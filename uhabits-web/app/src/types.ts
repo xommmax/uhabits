@@ -54,4 +54,6 @@ export interface HabitForm {
   category: string;
 }
 
-export type Route = { screen: "list" } | { screen: "habit"; id: number } | { screen: "edit"; id: number | null; numerical: boolean };
+export type Route = { screen: "list" } | { screen: "habit"; id: number } | { screen: "edit"; id: number | null; numerical: boolean }
+  | { screen: "settings" }
+  | { screen: "about" };

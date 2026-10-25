@@ -162,8 +162,7 @@ internal fun buildScoreChart(
     canvas: HTMLCanvasElement,
     habit: Habit,
     preferences: Preferences,
-    theme: Theme,
-    dark: Boolean
+    theme: Theme
 ): ChartHandle {
     val state = ScoreCardPresenter.buildState(
         habit = habit,
@@ -171,7 +170,7 @@ internal fun buildScoreChart(
         spinnerPosition = preferences.scoreCardSpinnerPosition,
         theme = theme
     )
-    val chart = ScoreChart(state.scores, state.bucketSize, theme.color(habit.color), ChartPalette(dark), dateFormatter)
+    val chart = ScoreChart(state.scores, state.bucketSize, theme.color(habit.color), ChartPalette(theme), dateFormatter)
     return ChartHandle(canvas, chart)
 }
 
@@ -179,8 +178,7 @@ internal fun buildFrequencyChart(
     canvas: HTMLCanvasElement,
     habit: Habit,
     preferences: Preferences,
-    theme: Theme,
-    dark: Boolean
+    theme: Theme
 ): ChartHandle {
     val state = FrequencyCardPresenter.buildState(habit, preferences.firstWeekday, theme)
     val chart = FrequencyChart(
@@ -188,15 +186,15 @@ internal fun buildFrequencyChart(
         state.isNumerical,
         state.firstWeekday,
         theme.color(habit.color),
-        ChartPalette(dark),
+        ChartPalette(theme),
         dateFormatter
     )
     return ChartHandle(canvas, chart)
 }
 
-internal fun buildStreakChart(canvas: HTMLCanvasElement, habit: Habit, theme: Theme, dark: Boolean): ChartHandle {
+internal fun buildStreakChart(canvas: HTMLCanvasElement, habit: Habit, theme: Theme): ChartHandle {
     val state = StreakCartPresenter.buildState(habit, theme)
-    return ChartHandle(canvas, StreakChart(state.bestStreaks, theme.color(habit.color), ChartPalette(dark)))
+    return ChartHandle(canvas, StreakChart(state.bestStreaks, theme.color(habit.color), ChartPalette(theme)))
 }
 
 /** Same labels as Android's TargetCardView.intervalToLabel. */
@@ -212,8 +210,7 @@ internal fun buildTargetChart(
     canvas: HTMLCanvasElement,
     habit: Habit,
     preferences: Preferences,
-    theme: Theme,
-    dark: Boolean
+    theme: Theme
 ): ChartHandle {
     val state = TargetCardPresenter.buildState(habit, preferences.firstWeekdayInt, theme)
     val chart = TargetChart(
@@ -221,7 +218,7 @@ internal fun buildTargetChart(
         state.values,
         state.targets,
         theme.color(habit.color),
-        ChartPalette(dark)
+        ChartPalette(theme)
     )
     return ChartHandle(canvas, chart)
 }

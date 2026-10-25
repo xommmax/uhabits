@@ -1,4 +1,5 @@
 import type { HabitsCore } from "./core";
+import { getBool } from "./prefs";
 
 const LAST_BACKUP = "backup:last";
 const FIRST_USE = "backup:firstUse";
@@ -66,7 +67,7 @@ export async function shareFile(file: File): Promise<boolean> {
 
 /** Shares an Android-compatible backup. Returns false if the user cancelled. */
 export async function shareBackup(core: HabitsCore): Promise<boolean> {
-  const bytes = core.exportBackup() as Uint8Array<ArrayBuffer>;
+  const bytes = core.exportBackup(getBool("web_backup_categories")) as Uint8Array<ArrayBuffer>;
   const file = new File([bytes], backupFileName(), { type: "application/octet-stream" });
   if (!(await shareFile(file))) return false;
   localStorage.setItem(LAST_BACKUP, String(Date.now()));

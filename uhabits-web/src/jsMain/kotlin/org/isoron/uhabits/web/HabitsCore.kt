@@ -37,8 +37,12 @@ import org.isoron.uhabits.core.commands.EditHabitCommand
 import org.isoron.uhabits.core.commands.ReorderHabitCommand
 import org.isoron.uhabits.core.commands.ReorderTarget
 import org.isoron.uhabits.core.commands.UnarchiveHabitsCommand
+import org.isoron.uhabits.core.io.GenericImporter
+import org.isoron.uhabits.core.io.HabitBullCSVImporter
 import org.isoron.uhabits.core.io.HabitsCSVExporter
 import org.isoron.uhabits.core.io.LoopDBImporter
+import org.isoron.uhabits.core.io.RewireDBImporter
+import org.isoron.uhabits.core.io.TickmateDBImporter
 import org.isoron.uhabits.core.io.StandardLogging
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
@@ -56,6 +60,7 @@ import org.isoron.uhabits.core.ui.screens.habits.show.views.OverviewCardPresente
 import org.isoron.uhabits.core.ui.screens.habits.show.views.TargetCardPresenter
 import org.isoron.uhabits.core.ui.views.DarkTheme
 import org.isoron.uhabits.core.ui.views.LightTheme
+import org.isoron.uhabits.core.ui.views.PureBlackTheme
 import org.khronos.webgl.Uint8Array
 import org.w3c.dom.HTMLCanvasElement
 import kotlin.js.Promise
@@ -102,6 +107,7 @@ class HabitsCore internal constructor(
     private val commandRunner = CommandRunner(CoroutineTaskRunner(Dispatchers.Default, Dispatchers.Default))
     private val lightTheme = LightTheme()
     private val darkTheme = DarkTheme()
+    private val pureBlackTheme = PureBlackTheme()
 
     init {
         setToday(computeToday(preferences.midnightDelayHours, 0))
@@ -116,6 +122,16 @@ class HabitsCore internal constructor(
 
     /** Today's date, as days since 2000-01-01. */
     fun today(): Int = getToday().daysSince2000
+
+    /** Re-applies settings that affect computed data (first weekday, midnight delay). */
+    fun applyPreferences() {
+        setToday(computeToday(preferences.midnightDelayHours, 0))
+        setFirstWeekday(preferences.firstWeekday)
+        for (h in habitList) h.recompute()
+    }
+
+    /** Android's "Repair database" (Troubleshooting). */
+    fun repairDatabase() = habitList.repair()
 
     /** Re-reads the clock; returns true (and recomputes all habits) if the day changed. */
     fun refreshToday(): Boolean {
@@ -329,21 +345,25 @@ class HabitsCore internal constructor(
     /** [bucket] is the position in Android's score card spinner (Day, Week, Month, Quarter, Year). */
     fun scoreChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean, bucket: Int): ChartHandle {
         preferences.scoreCardSpinnerPosition = bucket
-        return buildScoreChart(canvas, habit(id), preferences, theme(dark), dark)
+        return buildScoreChart(canvas, habit(id), preferences, theme(dark))
     }
 
     fun frequencyChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
-        buildFrequencyChart(canvas, habit(id), preferences, theme(dark), dark)
+        buildFrequencyChart(canvas, habit(id), preferences, theme(dark))
 
     fun streakChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
-        buildStreakChart(canvas, habit(id), theme(dark), dark)
+        buildStreakChart(canvas, habit(id), theme(dark))
 
     fun targetChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
-        buildTargetChart(canvas, habit(id), preferences, theme(dark), dark)
+        buildTargetChart(canvas, habit(id), preferences, theme(dark))
 
-    /** Zip of CSV files for the given habits, same as Android's "Export" (HabitsCSVExporter). */
+    /**
+     * Zip of CSV files for the given habits, or for all habits when [ids] is empty
+     * (Android's "Export" and "Export as CSV", via HabitsCSVExporter).
+     */
     fun exportCsv(ids: Array<Int>): Promise<Uint8Array> = GlobalScope.promise {
-        HabitsCSVExporter(habitList, ids.map(::habit)).writeArchive().toUint8Array()
+        val selected = if (ids.isEmpty()) habitList.toList() else ids.map(::habit)
+        HabitsCSVExporter(habitList, selected).writeArchive().toUint8Array()
     }
 
     /** Raw copy of the live database, used to persist it in the browser. */
@@ -351,11 +371,12 @@ class HabitsCore internal constructor(
 
     /**
      * Backup file compatible with Loop for Android: same SQLite format as the
-     * app's "Export full backup", downgraded to the released schema version.
+     * app's "Export full backup". Without [includeCategories] it is downgraded
+     * to the released schema version, which the current Android app accepts.
      */
-    fun exportBackup(): Uint8Array {
+    fun exportBackup(includeCategories: Boolean): Uint8Array {
         val copy = WebDatabase(sqlJs, db.export())
-        if (copy.getVersion() > BACKUP_DATABASE_VERSION) {
+        if (!includeCategories && copy.getVersion() > BACKUP_DATABASE_VERSION) {
             // Version 26 only added Habits.category, which Android 2.3.2 does not know about.
             check(copy.getVersion() == 26) { "Cannot downgrade database version ${copy.getVersion()}" }
             copy.run("ALTER TABLE Habits DROP COLUMN category")
@@ -367,21 +388,29 @@ class HabitsCore internal constructor(
         return bytes
     }
 
-    /** Imports a Loop backup (.db), merging it into the current habits. Resolves to false if unrecognized. */
+    /**
+     * Imports a Loop backup (.db) or a Rewire, Tickmate or HabitBull export, merging it
+     * into the current habits (Android's "Import data"). Resolves to false if unrecognized.
+     */
     fun importBackup(data: Uint8Array): Promise<Boolean> = GlobalScope.promise {
         val path = "import.db"
         storage.write(path, data.toByteArray())
         try {
             val file = fileOpener.openUserFile(path)
-            val importer = LoopDBImporter(
-                habitList,
-                modelFactory,
-                WebDatabaseOpener(sqlJs, storage),
-                commandRunner,
-                StandardLogging(),
-                fileOpener
+            val opener = WebDatabaseOpener(sqlJs, storage)
+            val logging = StandardLogging()
+            val importer = GenericImporter(
+                LoopDBImporter(habitList, modelFactory, opener, commandRunner, logging, fileOpener),
+                RewireDBImporter(habitList, modelFactory, opener),
+                TickmateDBImporter(habitList, modelFactory, opener),
+                HabitBullCSVImporter(habitList, modelFactory, logging)
             )
-            if (!importer.canHandle(file)) return@promise false
+            val recognized = try {
+                importer.canHandle(file)
+            } catch (e: Throwable) {
+                false
+            }
+            if (!recognized) return@promise false
             importer.importHabitsFromFile(file)
             true
         } finally {
@@ -396,7 +425,11 @@ class HabitsCore internal constructor(
 
     private fun habit(id: Int): Habit = habitList.getById(id.toLong()) ?: error("Habit not found: $id")
 
-    private fun theme(dark: Boolean) = if (dark) darkTheme else lightTheme
+    private fun theme(dark: Boolean) = when {
+        !dark -> lightTheme
+        preferences.isPureBlackEnabled -> pureBlackTheme
+        else -> darkTheme
+    }
 
     private fun habitSummary(habit: Habit): dynamic {
         val result: dynamic = js("{}")

@@ -18,6 +18,9 @@ import org.isoron.platform.time.getToday
 import org.isoron.platform.time.getWeekdaySequence
 import org.isoron.uhabits.core.models.Score
 import org.isoron.uhabits.core.models.Streak
+import org.isoron.uhabits.core.ui.views.DarkTheme
+import org.isoron.uhabits.core.ui.views.PureBlackTheme
+import org.isoron.uhabits.core.ui.views.Theme
 import org.isoron.uhabits.core.ui.views.toShortString
 import kotlin.js.Date
 import kotlin.math.floor
@@ -33,12 +36,14 @@ private const val REGULAR_TEXT_SIZE = 16.0
 private const val BASE_SIZE = 20.0
 private const val FONT_SPACING = 1.17
 
-/** Android's ?attr/contrastNN theme colors. */
-class ChartPalette(dark: Boolean) {
-    val contrast0 = Color(if (dark) 0x212121 else 0xFFFFFF)
-    val contrast20 = Color(if (dark) 0x424242 else 0xE0E0E0)
+/** Android's ?attr/contrastNN theme colors for the light, dark and pure black themes. */
+class ChartPalette(theme: Theme) {
+    private val pureBlack = theme is PureBlackTheme
+    private val dark = theme is DarkTheme
+    val contrast0 = Color(if (pureBlack) 0x000000 else if (dark) 0x212121 else 0xFFFFFF)
+    val contrast20 = Color(if (pureBlack) 0x212121 else if (dark) 0x424242 else 0xE0E0E0)
     val contrast60 = Color(0x9E9E9E)
-    val cardBackground = Color(if (dark) 0x303030 else 0xFAFAFA)
+    val cardBackground = Color(if (pureBlack) 0x000000 else if (dark) 0x303030 else 0xFAFAFA)
 }
 
 /** Android draws text at a baseline; core's Canvas centers it vertically. */
