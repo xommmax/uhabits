@@ -1,0 +1,63 @@
+# Builds the iPhone web app (uhabits-web) and publishes it to GitHub Pages.
+name: Deploy web app
+
+on:
+  push:
+    branches: [web-pwa]
+    paths: [uhabits-web/**, uhabits-core/**, .github/workflows/web-pages.yml]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compile Kotlin bridge
+        run: ./gradlew :uhabits-web:jsBrowserProductionLibraryDistribution
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: uhabits-web/app/package-lock.json
+
+      - name: Build web app
+        working-directory: uhabits-web/app
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}/
+        run: |
+          npm ci
+          npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: uhabits-web/app/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
