@@ -4,6 +4,7 @@ import type { Route } from "./types";
 import { ListScreen } from "./ListScreen";
 import { HabitScreen } from "./HabitScreen";
 import { EditScreen } from "./EditScreen";
+import { Intro } from "./Intro";
 
 const TOAST_MS = 2500;
 const CLOCK_CHECK_MS = 60_000;
@@ -12,6 +13,7 @@ export function App({ core }: { core: HabitsCore }) {
   const [route, setRoute] = useState<Route>({ screen: "list" });
   const [rev, setRev] = useState(0);
   const [toastText, setToastText] = useState<string | null>(null);
+  const [showIntro, setShowIntro] = useState(() => core.consumeFirstRun());
   const refresh = () => setRev((r) => r + 1);
 
   const toast = (message: string) => {
@@ -43,6 +45,7 @@ export function App({ core }: { core: HabitsCore }) {
           toast={toast}
           onOpen={(id) => setRoute({ screen: "habit", id })}
           onAdd={(numerical) => setRoute({ screen: "edit", id: null, numerical })}
+          onEdit={(id) => setRoute({ screen: "edit", id, numerical: false })}
         />
       );
       break;
@@ -78,6 +81,7 @@ export function App({ core }: { core: HabitsCore }) {
     <>
       {screen}
       {toastText && <div class="toast">{toastText}</div>}
+      {showIntro && <Intro onDone={() => setShowIntro(false)} />}
     </>
   );
 }

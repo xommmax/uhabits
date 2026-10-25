@@ -2,16 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { ChartHandle } from "habits-core";
 
-export function useDarkMode(): boolean {
-  const query = matchMedia("(prefers-color-scheme: dark)");
-  const [dark, setDark] = useState(query.matches);
-  useEffect(() => {
-    const onChange = () => setDark(query.matches);
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
-  return dark;
-}
+export { useDarkMode } from "./theme";
 
 /** Score ring like Android's RingView: grey track, colored arc from 12 o'clock. */
 export function Ring({ value, color, size = 24, thickness = 4 }: { value: number; color: string; size?: number; thickness?: number }) {

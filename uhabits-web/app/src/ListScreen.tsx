@@ -1,17 +1,29 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitRow } from "./types";
-import { Ring, Sheet, TopBar, useDarkMode } from "./components";
+import { FA, Icon, Ring, Sheet, type SheetItem, TopBar, useDarkMode } from "./components";
+import { daysSinceBackup, pickBackupFile, shareBackup, shouldRemind, snoozeReminder } from "./backup";
+import { Entry, formatDay, PALETTE, shortNumber } from "./format";
 import { celebrate, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
 import { getBool, Pref } from "./prefs";
-import { daysSinceBackup, pickBackupFile, shareBackup, shouldRemind, snoozeReminder } from "./backup";
-import { Entry, formatDay, shortNumber } from "./format";
+import { isNightMode, toggleNightMode } from "./theme";
 
 const COLUMN_WIDTH = 44;
 const NAME_MIN_WIDTH = 150;
+const LONG_PRESS_MS = 500;
+const HELP_URL = "https://loophabits.org/faq.html";
+
+// Android's res/values/strings.xml "hints" array
+const HINTS = [
+  "To rearrange the entries, press-and-hold on the name of the habit, then drag it to the correct place.",
+  "You can see more days by putting your phone in landscape mode.",
+];
+
+// FontAwesome glyphs used by Android's toolbar and selection menu
+const ICON = { search: "", edit: "", color: "", archive: "", unarchive: "", delete: "" };
 
 function useDayColumns(): number {
-  const compute = () => Math.max(3, Math.min(7, Math.floor((window.innerWidth - NAME_MIN_WIDTH - 24) / COLUMN_WIDTH)));
+  const compute = () => Math.max(3, Math.min(14, Math.floor((window.innerWidth - NAME_MIN_WIDTH - 24) / COLUMN_WIDTH)));
   const [n, setN] = useState(compute);
   useEffect(() => {
     const onResize = () => setN(compute());
@@ -34,6 +46,10 @@ function versionText(): string {
   return `Version ${version} (${commit}) · built ${built}`;
 }
 
+// While a habit is being dragged, stop the page from scrolling (iOS needs a non-passive listener).
+let dragging = false;
+document.addEventListener("touchmove", (e) => dragging && e.preventDefault(), { passive: false });
+
 interface Props {
   core: HabitsCore;
   rev: number;
@@ -41,22 +57,83 @@ interface Props {
   toast: (message: string) => void;
   onOpen: (id: number) => void;
   onAdd: (numerical: boolean) => void;
+  onEdit: (id: number) => void;
 }
 
-export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) {
+type Dialog =
+  | { kind: "menu" }
+  | { kind: "filter" }
+  | { kind: "sort" }
+  | { kind: "color" }
+  | { kind: "category"; title: string; initial: string; onSave: (name: string) => void }
+  | { kind: "type" }
+  | null;
+
+export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit }: Props) {
   const dark = useDarkMode();
   const columns = useDayColumns();
-  const [showArchived, setShowArchived] = useState(localStorage.getItem("ui:showArchived") === "1");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [reordering, setReordering] = useState(false);
-  const [remind, setRemind] = useState(shouldRemind);
+  const [query, setQuery] = useState<string | null>(null);
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [dialog, setDialog] = useState<Dialog>(null);
   const [popup, setPopup] = useState<PopupRequest | null>(null);
-  const [pickingType, setPickingType] = useState(false);
-
-  const habits = core.listHabits(showArchived, columns) as HabitRow[];
-  const today = core.today();
+  const [remind, setRemind] = useState(shouldRemind);
+  const [hint, setHint] = useState<string | null>(() => core.nextHint(HINTS) ?? null);
+  const [drag, setDrag] = useState<{ id: number; dy: number; rects: DOMRect[]; start: number } | null>(null);
+  const rowRefs = useRef(new Map<number, HTMLDivElement>());
   void rev;
 
+  const habits = core.listHabits(query ?? "", columns) as HabitRow[];
+  const options = core.listOptions() as { showArchived: boolean; showCompleted: boolean; order: string };
+  const manualOrder = options.order === "BY_POSITION";
+  const today = core.today();
+  const reversed = getBool(Pref.reverseDays);
+  const dayIndexes = Array.from({ length: columns }, (_, i) => (reversed ? columns - 1 - i : i));
+  const colorOf = (h: HabitRow) => (dark ? h.colorDark : h.colorLight);
+  const selectedHabits = habits.filter((h) => selected.has(h.id));
+  const selecting = selected.size > 0;
+
+  const clearSelection = () => setSelected(new Set());
+  const toggleSelected = (id: number) => {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  };
+
+  // --- Drag to reorder (press and hold the name, then drag), like Android ---
+  const dragTarget = (() => {
+    if (!drag) return -1;
+    const center = drag.rects[drag.start].top + drag.rects[drag.start].height / 2 + drag.dy;
+    let best = drag.start;
+    drag.rects.forEach((r, i) => {
+      if (Math.abs(r.top + r.height / 2 - center) < Math.abs(drag.rects[best].top + drag.rects[best].height / 2 - center)) best = i;
+    });
+    return best;
+  })();
+  const dragShift = (i: number) => {
+    if (!drag || i === drag.start) return 0;
+    const h = drag.rects[drag.start].height + 4;
+    if (drag.start < i && i <= dragTarget) return -h;
+    if (dragTarget <= i && i < drag.start) return h;
+    return 0;
+  };
+  const startDrag = (id: number) => {
+    if (!manualOrder || query) return;
+    const rects = habits.map((h) => rowRefs.current.get(h.id)!.getBoundingClientRect());
+    dragging = true;
+    setDrag({ id, dy: 0, rects, start: habits.findIndex((h) => h.id === id) });
+  };
+  const endDrag = () => {
+    dragging = false;
+    if (drag && dragTarget !== drag.start && dragTarget >= 0) {
+      core.move(drag.id, habits[dragTarget].id, dragTarget < drag.start);
+      clearSelection();
+      refresh();
+    }
+    setDrag(null);
+  };
+
+  // --- Actions ---
   const backUp = async () => {
     try {
       if (await shareBackup(core)) {
@@ -67,7 +144,6 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
       toast("Could not create the backup");
     }
   };
-
   const restore = async () => {
     const data = await pickBackupFile();
     if (!data) return;
@@ -78,29 +154,133 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
       toast("This file is not a Loop backup");
     }
   };
-
-  const toggleArchived = () => {
-    localStorage.setItem("ui:showArchived", showArchived ? "0" : "1");
-    setShowArchived(!showArchived);
+  const ids = () => [...selected];
+  const afterBulk = () => {
+    clearSelection();
+    refresh();
   };
+  const deleteSelected = () => {
+    const n = selected.size;
+    if (!confirm(n === 1 ? "Delete this habit? This cannot be undone." : `Delete ${n} habits? This cannot be undone.`)) return;
+    core.delete(ids());
+    afterBulk();
+  };
+  const categorize = () => {
+    const current = selectedHabits.find((h) => h.category.trim())?.category ?? "";
+    setDialog({ kind: "category", title: "Categorize", initial: current, onSave: (name) => { core.changeCategory(ids(), name); afterBulk(); } });
+  };
+  const renameCategory = (name: string) =>
+    setDialog({ kind: "category", title: "Rename category", initial: name, onSave: (next) => { if (next.trim()) core.renameCategory(name, next); refresh(); } });
 
-  return (
-    <div class="screen">
+  const pickSort = (by: string) => {
+    core.sortBy(by);
+    refresh();
+  };
+  const orderIs = (...orders: string[]) => orders.includes(options.order);
+
+  // --- Top bar: normal, search, or selection mode ---
+  let topBar;
+  if (selecting) {
+    const canArchive = selectedHabits.every((h) => !h.archived);
+    const canUnarchive = selectedHabits.every((h) => h.archived);
+    topBar = (
+      <TopBar
+        left={<button class="bar-button" onClick={clearSelection}>Cancel</button>}
+        title={`${selected.size} selected`}
+        right={
+          <>
+            {selected.size === 1 && <button class="bar-button fa-button" aria-label="Edit" onClick={() => { const [id] = ids(); clearSelection(); onEdit(id); }}><Icon glyph={ICON.edit} /></button>}
+            <button class="bar-button fa-button" aria-label="Change color" onClick={() => setDialog({ kind: "color" })}><Icon glyph={ICON.color} /></button>
+            {canArchive && <button class="bar-button fa-button" aria-label="Archive" onClick={() => { core.archive(ids()); afterBulk(); }}><Icon glyph={ICON.archive} /></button>}
+            {canUnarchive && <button class="bar-button fa-button" aria-label="Unarchive" onClick={() => { core.unarchive(ids()); afterBulk(); }}><Icon glyph={ICON.unarchive} /></button>}
+            <button class="bar-button fa-button" aria-label="Categorize" onClick={categorize}><Icon glyph={FA.tag} /></button>
+            <button class="bar-button fa-button" aria-label="Delete" onClick={deleteSelected}><Icon glyph={ICON.delete} /></button>
+          </>
+        }
+      />
+    );
+  } else if (query !== null) {
+    topBar = (
+      <header class="topbar search-bar">
+        <input
+          class="search-input"
+          type="search"
+          placeholder="Search"
+          autoFocus
+          value={query}
+          onInput={(e) => setQuery(e.currentTarget.value)}
+        />
+        <button class="bar-button" onClick={() => setQuery(null)}>Cancel</button>
+      </header>
+    );
+  } else {
+    topBar = (
       <TopBar
         title={<span class="large-title">Habits</span>}
         right={
-          reordering ? (
-            <button class="bar-button bold" onClick={() => setReordering(false)}>Done</button>
-          ) : (
-            <>
-              <button class="bar-button icon" aria-label="Add habit" onClick={() => setPickingType(true)}>＋</button>
-              <button class="bar-button icon" aria-label="Menu" onClick={() => setMenuOpen(true)}>⋯</button>
-            </>
-          )
+          <>
+            <button class="bar-button fa-button" aria-label="Search" onClick={() => setQuery("")}><Icon glyph={ICON.search} /></button>
+            <button class="bar-button icon" aria-label="Add habit" onClick={() => setDialog({ kind: "type" })}>＋</button>
+            <button class="bar-button icon" aria-label="Menu" onClick={() => setDialog({ kind: "menu" })}>⋯</button>
+          </>
         }
       />
+    );
+  }
 
-      {remind && habits.length > 0 && (
+  // --- Rows, with category headers like HabitCardListAdapter.buildRows ---
+  const rows: preact.JSX.Element[] = [];
+  let lastCategory: string | null = null;
+  habits.forEach((h, i) => {
+    const category = h.category.trim();
+    if (category && category !== lastCategory) {
+      rows.push(<button key={`c:${category}`} class="category-header" onClick={() => renameCategory(category)}>{category}</button>);
+      lastCategory = category;
+    }
+    const isDragged = drag?.id === h.id;
+    rows.push(
+      <HabitRowView
+        key={h.id}
+        rowRef={(el) => (el ? rowRefs.current.set(h.id, el) : rowRefs.current.delete(h.id))}
+        habit={h}
+        color={colorOf(h)}
+        dayIndexes={dayIndexes}
+        selected={selected.has(h.id)}
+        style={drag ? { transform: `translateY(${isDragged ? drag.dy : dragShift(i)}px)` } : undefined}
+        dragClass={drag ? (isDragged ? " dragging" : " shifting") : ""}
+        onTapName={() => (selecting ? toggleSelected(h.id) : onOpen(h.id))}
+        onLongPressName={() => {
+          setSelected(new Set([...selected, h.id]));
+          startDrag(h.id);
+        }}
+        onDragMove={(dy) => drag && setDrag({ ...drag, dy })}
+        onDragEnd={endDrag}
+        onToggle={(i, x, y) => {
+          const value = core.toggle(h.id, today - i);
+          if (value === Entry.YES_MANUAL) celebrate(colorOf(h), x, y);
+          refresh();
+        }}
+        onPopup={(i, x, y) =>
+          setPopup({ habitId: h.id, day: today - i, numerical: h.numerical, color: colorOf(h), atLeast: h.targetType === 0, x, y })
+        }
+      />,
+    );
+  });
+
+  const menuItems: SheetItem[] = [
+    { label: "Filter", onClick: () => setDialog({ kind: "filter" }) },
+    { label: "Sort", onClick: () => setDialog({ kind: "sort" }) },
+    { label: "Dark theme", checked: isNightMode(), onClick: toggleNightMode },
+    { label: "Back up now", onClick: backUp },
+    { label: "Restore from backup", onClick: restore },
+    { label: "Help & FAQ", onClick: () => window.open(HELP_URL, "_blank") },
+  ];
+
+  return (
+    <div class="screen">
+      {topBar}
+
+      {remind && habits.length > 0 && !selecting && (
         <div class="banner">
           <div class="banner-text">💾 It's been a while since you saved a copy of your habits.</div>
           <div class="banner-actions">
@@ -110,68 +290,70 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
         </div>
       )}
 
+      {hint && !selecting && (
+        <button class="hint-card" onClick={() => setHint(null)}>
+          <div class="hint-title">Did you know?</div>
+          <div>{hint}</div>
+        </button>
+      )}
+
       {habits.length === 0 ? (
         <div class="empty">
-          <p>You have no habits yet.</p>
-          <button class="primary-button" onClick={() => setPickingType(true)}>Add a habit</button>
+          <p>{query ? "No habits found." : "You have no active habits"}</p>
+          {!query && <button class="primary-button" onClick={() => setDialog({ kind: "type" })}>Add a habit</button>}
         </div>
       ) : (
         <div class="habit-list">
-          {!reordering && (
-            <div class="list-header">
-              <div class="list-header-spacer" />
-              {Array.from({ length: columns }, (_, i) => (
-                <div class="day-label">
-                  <span>{formatDay(today - i, { weekday: "short" }).toUpperCase()}</span>
-                  <span>{formatDay(today - i, { day: "numeric" })}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {reordering ? (
-            <ReorderList habits={habits} dark={dark} onMove={(id, refId, before) => { core.move(id, refId, before); refresh(); }} />
-          ) : (
-            habits.map((h) => (
-              <HabitRowView
-                key={h.id}
-                habit={h}
-                dark={dark}
-                onOpen={() => onOpen(h.id)}
-                onToggle={(i, x, y) => {
-                  const value = core.toggle(h.id, today - i);
-                  if (value === Entry.YES_MANUAL) celebrate(dark ? h.colorDark : h.colorLight, x, y);
-                  refresh();
-                }}
-                onPopup={(i, x, y) =>
-                  setPopup({
-                    habitId: h.id,
-                    day: today - i,
-                    numerical: h.numerical,
-                    color: dark ? h.colorDark : h.colorLight,
-                    atLeast: h.targetType === 0,
-                    x,
-                    y,
-                  })
-                }
-              />
-            ))
-          )}
+          <div class="list-header">
+            <div class="list-header-spacer" />
+            {dayIndexes.map((i) => (
+              <div class="day-label">
+                <span>{formatDay(today - i, { weekday: "short" }).toUpperCase()}</span>
+                <span>{formatDay(today - i, { day: "numeric" })}</span>
+              </div>
+            ))}
+          </div>
+          {rows}
         </div>
       )}
 
       {popup && <EntryPopup core={core} request={popup} onClose={(changed) => { setPopup(null); if (changed) refresh(); }} />}
-      {pickingType && <HabitTypePicker onClose={() => setPickingType(false)} onPick={(numerical) => { setPickingType(false); onAdd(numerical); }} />}
-
-      {menuOpen && (
+      {dialog?.kind === "type" && <HabitTypePicker onClose={() => setDialog(null)} onPick={(numerical) => { setDialog(null); onAdd(numerical); }} />}
+      {dialog?.kind === "menu" && <Sheet onClose={() => setDialog(null)} footer={`${lastBackupText()}\n${versionText()}`} items={menuItems} />}
+      {dialog?.kind === "filter" && (
         <Sheet
-          onClose={() => setMenuOpen(false)}
-          footer={`${lastBackupText()}\n${versionText()}`}
+          onClose={() => setDialog(null)}
           items={[
-            { label: "Show archived", checked: showArchived, onClick: toggleArchived },
-            { label: "Reorder habits", onClick: () => setReordering(true) },
-            { label: "Back up now", onClick: backUp },
-            { label: "Restore from backup", onClick: restore },
+            { label: "Hide archived", checked: !options.showArchived, onClick: () => { core.setShowArchived(!options.showArchived); refresh(); } },
+            { label: "Hide completed", checked: !options.showCompleted, onClick: () => { core.setShowCompleted(!options.showCompleted); refresh(); } },
           ]}
+        />
+      )}
+      {dialog?.kind === "sort" && (
+        <Sheet
+          onClose={() => setDialog(null)}
+          items={[
+            { label: "Manually", checked: manualOrder, onClick: () => pickSort("manual") },
+            { label: "By name", checked: orderIs("BY_NAME_ASC", "BY_NAME_DESC"), onClick: () => pickSort("name") },
+            { label: "By color", checked: orderIs("BY_COLOR_ASC", "BY_COLOR_DESC"), onClick: () => pickSort("color") },
+            { label: "By score", checked: orderIs("BY_SCORE_ASC", "BY_SCORE_DESC"), onClick: () => pickSort("score") },
+            { label: "By status", checked: orderIs("BY_STATUS_ASC", "BY_STATUS_DESC"), onClick: () => pickSort("status") },
+          ]}
+        />
+      )}
+      {dialog?.kind === "color" && (
+        <ColorPicker
+          onClose={() => setDialog(null)}
+          onPick={(index) => { setDialog(null); core.changeColor(ids(), index); afterBulk(); }}
+        />
+      )}
+      {dialog?.kind === "category" && (
+        <CategoryDialog
+          title={dialog.title}
+          initial={dialog.initial}
+          suggestions={core.categories()}
+          onClose={() => setDialog(null)}
+          onSave={(name) => { setDialog(null); dialog.onSave(name); }}
         />
       )}
     </div>
@@ -180,26 +362,71 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd }: Props) 
 
 interface RowProps {
   habit: HabitRow;
-  dark: boolean;
-  onOpen: () => void;
+  color: string;
+  dayIndexes: number[];
+  selected: boolean;
+  style?: Record<string, string>;
+  dragClass: string;
+  rowRef: (el: HTMLDivElement | null) => void;
+  onTapName: () => void;
+  onLongPressName: () => void;
+  onDragMove: (dy: number) => void;
+  onDragEnd: () => void;
   onToggle: (daysAgo: number, x: number, y: number) => void;
   onPopup: (daysAgo: number, x: number, y: number) => void;
 }
 
 function HabitRowView(props: RowProps) {
-  const { habit, dark } = props;
-  const color = dark ? habit.colorDark : habit.colorLight;
+  const { habit, color } = props;
+  const press = useRef({ timer: 0 as unknown as ReturnType<typeof setTimeout>, startY: 0, long: false });
+
   return (
-    <div class={`habit-row${habit.archived ? " archived" : ""}`}>
-      <button class="habit-name" onClick={props.onOpen}>
+    <div
+      ref={props.rowRef}
+      class={`habit-row${habit.archived ? " archived" : ""}${props.selected ? " selected" : ""}${props.dragClass}`}
+      style={props.style}
+    >
+      <button
+        class="habit-name"
+        onPointerDown={(e) => {
+          const p = press.current;
+          p.long = false;
+          p.startY = e.clientY;
+          try {
+            (e.currentTarget as Element).setPointerCapture(e.pointerId);
+          } catch {
+            // The pointer may already be gone; dragging then just ends early.
+          }
+          p.timer = setTimeout(() => {
+            p.long = true;
+            props.onLongPressName();
+          }, LONG_PRESS_MS);
+        }}
+        onPointerMove={(e) => {
+          const p = press.current;
+          if (p.long) props.onDragMove(e.clientY - p.startY);
+          else if (Math.abs(e.clientY - p.startY) > 8) clearTimeout(p.timer);
+        }}
+        onPointerUp={() => {
+          const p = press.current;
+          clearTimeout(p.timer);
+          if (p.long) props.onDragEnd();
+          else props.onTapName();
+        }}
+        onPointerCancel={() => {
+          clearTimeout(press.current.timer);
+          if (press.current.long) props.onDragEnd();
+        }}
+        onContextMenu={(e) => e.preventDefault()}
+      >
         <Ring value={habit.score} color={color} />
         <span style={{ color }}>{habit.name}</span>
       </button>
-      {habit.values.map((value, i) => (
+      {props.dayIndexes.map((i) => (
         <CheckButton
           habit={habit}
           index={i}
-          value={value}
+          value={habit.values[i]}
           color={color}
           onToggle={(x, y) => props.onToggle(i, x, y)}
           onPopup={(x, y) => props.onPopup(i, x, y)}
@@ -273,54 +500,47 @@ function NumberCell(props: { value: number; completed: boolean; unit: string; co
   );
 }
 
-/** Drag the ≡ handle to move a habit. */
-function ReorderList(props: { habits: HabitRow[]; dark: boolean; onMove: (id: number, refId: number, before: boolean) => void }) {
-  const [drag, setDrag] = useState<{ index: number; dy: number; rowHeight: number } | null>(null);
-  const startY = useRef(0);
-  const target = drag ? Math.max(0, Math.min(props.habits.length - 1, drag.index + Math.round(drag.dy / drag.rowHeight))) : -1;
-
-  const shift = (i: number) => {
-    if (!drag || i === drag.index) return 0;
-    if (drag.index < i && i <= target) return -drag.rowHeight;
-    if (target <= i && i < drag.index) return drag.rowHeight;
-    return 0;
-  };
-
-  const finish = () => {
-    if (drag && target !== drag.index) {
-      props.onMove(props.habits[drag.index].id, props.habits[target].id, target < drag.index);
-    }
-    setDrag(null);
-  };
-
+/** Android's ColorPickerDialog: the 20 palette colors. */
+function ColorPicker(props: { onPick: (index: number) => void; onClose: () => void }) {
   return (
-    <>
-      {props.habits.map((h, i) => (
-        <div
-          key={h.id}
-          class={`habit-row reorder${drag?.index === i ? " dragging" : ""}`}
-          style={{ transform: `translateY(${drag?.index === i ? drag.dy : shift(i)}px)` }}
-        >
-          <span class="habit-name">
-            <Ring value={h.score} color={props.dark ? h.colorDark : h.colorLight} />
-            <span style={{ color: props.dark ? h.colorDark : h.colorLight }}>{h.name}</span>
-          </span>
-          <span
-            class="drag-handle"
-            onPointerDown={(e) => {
-              (e.currentTarget as Element).setPointerCapture(e.pointerId);
-              startY.current = e.clientY;
-              const row = (e.currentTarget as HTMLElement).parentElement!;
-              setDrag({ index: i, dy: 0, rowHeight: row.offsetHeight });
-            }}
-            onPointerMove={(e) => drag && setDrag({ ...drag, dy: e.clientY - startY.current })}
-            onPointerUp={finish}
-            onPointerCancel={() => setDrag(null)}
-          >
-            ≡
-          </span>
+    <div class="overlay center" onClick={props.onClose}>
+      <div class="color-picker" onClick={(e) => e.stopPropagation()}>
+        <div class="dialog-title">Change color</div>
+        <div class="swatches">
+          {PALETTE.map((hex, i) => (
+            <button class="swatch" style={{ background: hex }} aria-label={`Color ${i + 1}`} onClick={() => props.onPick(i)} />
+          ))}
         </div>
-      ))}
-    </>
+      </div>
+    </div>
+  );
+}
+
+/** Android's CategoryDialog, with existing categories as suggestions. */
+function CategoryDialog(props: { title: string; initial: string; suggestions: string[]; onSave: (name: string) => void; onClose: () => void }) {
+  const [name, setName] = useState(props.initial);
+  return (
+    <div class="overlay center" onClick={props.onClose}>
+      <div class="category-dialog" onClick={(e) => e.stopPropagation()}>
+        <div class="dialog-title">{props.title}</div>
+        <input
+          class="dialog-input"
+          placeholder="Category"
+          value={name}
+          autoFocus
+          onInput={(e) => setName(e.currentTarget.value)}
+          onKeyDown={(e) => e.key === "Enter" && props.onSave(name)}
+        />
+        {props.suggestions.length > 0 && (
+          <div class="chips">
+            {props.suggestions.map((s) => <button class="chip" onClick={() => setName(s)}>{s}</button>)}
+          </div>
+        )}
+        <div class="dialog-buttons">
+          <button onClick={props.onClose}>Cancel</button>
+          <button class="bold" onClick={() => props.onSave(name)}>Save</button>
+        </div>
+      </div>
+    </div>
   );
 }

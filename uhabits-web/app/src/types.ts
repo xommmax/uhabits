@@ -51,6 +51,7 @@ export interface HabitForm {
   unit: string;
   targetValue: number;
   targetType: number;
+  category: string;
 }
 
 export type Route = { screen: "list" } | { screen: "habit"; id: number } | { screen: "edit"; id: number | null; numerical: boolean };

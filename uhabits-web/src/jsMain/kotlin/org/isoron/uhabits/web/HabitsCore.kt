@@ -25,6 +25,9 @@ import org.isoron.platform.time.setFirstWeekday
 import org.isoron.platform.time.setToday
 import org.isoron.uhabits.core.DATABASE_VERSION
 import org.isoron.uhabits.core.commands.ArchiveHabitsCommand
+import org.isoron.uhabits.core.commands.ChangeHabitCategoryCommand
+import org.isoron.uhabits.core.commands.ChangeHabitColorCommand
+import org.isoron.uhabits.core.commands.RenameCategoryCommand
 import org.isoron.uhabits.core.commands.Command
 import org.isoron.uhabits.core.commands.CommandRunner
 import org.isoron.uhabits.core.commands.CreateHabitCommand
@@ -40,12 +43,15 @@ import org.isoron.uhabits.core.io.StandardLogging
 import org.isoron.uhabits.core.models.Entry
 import org.isoron.uhabits.core.models.Frequency
 import org.isoron.uhabits.core.models.Habit
+import org.isoron.uhabits.core.models.HabitList
+import org.isoron.uhabits.core.models.HabitMatcher
 import org.isoron.uhabits.core.models.HabitType
 import org.isoron.uhabits.core.models.NumericalHabitType
 import org.isoron.uhabits.core.models.PaletteColor
 import org.isoron.uhabits.core.models.sqlite.SQLModelFactory
 import org.isoron.uhabits.core.preferences.Preferences
 import org.isoron.uhabits.core.tasks.CoroutineTaskRunner
+import org.isoron.uhabits.core.ui.screens.habits.list.HintList
 import org.isoron.uhabits.core.ui.screens.habits.show.views.OverviewCardPresenter
 import org.isoron.uhabits.core.ui.screens.habits.show.views.TargetCardPresenter
 import org.isoron.uhabits.core.ui.views.DarkTheme
@@ -120,19 +126,103 @@ class HabitsCore internal constructor(
         return true
     }
 
-    fun listHabits(showArchived: Boolean, days: Int): Array<dynamic> {
+    /**
+     * Habits shown on the main screen, filtered and sorted like Android's
+     * ListHabitsMenuBehavior (filters and sort order live in preferences).
+     */
+    fun listHabits(searchQuery: String, days: Int): Array<dynamic> {
         val today = getToday()
-        return habitList
-            .filter { showArchived || !it.isArchived }
-            .map { habit ->
-                val row = habitSummary(habit)
-                row.score = habit.scores[today].value
-                val entries = Array(days) { habit.computedEntries.get(today.minus(it)) }
-                row.values = entries.map { it.value }.toTypedArray()
-                row.notes = entries.map { it.notes }.toTypedArray()
-                row.completed = entries.map { it.completed }.toTypedArray()
-                row
-            }.toTypedArray()
+        val matcher = if (preferences.areQuestionMarksEnabled) {
+            HabitMatcher(
+                isArchivedAllowed = preferences.showArchived,
+                isEnteredAllowed = preferences.showCompleted,
+                searchQuery = searchQuery
+            )
+        } else {
+            HabitMatcher(
+                isArchivedAllowed = preferences.showArchived,
+                isCompletedAllowed = preferences.showCompleted,
+                searchQuery = searchQuery
+            )
+        }
+        val filtered = habitList.getFiltered(matcher)
+        filtered.primaryOrder = preferences.defaultPrimaryOrder
+        filtered.secondaryOrder = preferences.defaultSecondaryOrder
+        return filtered.map { habit ->
+            val row = habitSummary(habit)
+            row.score = habit.scores[today].value
+            val entries = Array(days) { habit.computedEntries.get(today.minus(it)) }
+            row.values = entries.map { it.value }.toTypedArray()
+            row.notes = entries.map { it.notes }.toTypedArray()
+            row.completed = entries.map { it.completed }.toTypedArray()
+            row
+        }.toTypedArray()
+    }
+
+    /** Filter and sort options of the main screen menu. */
+    fun listOptions(): dynamic {
+        val result: dynamic = js("{}")
+        result.showArchived = preferences.showArchived
+        result.showCompleted = preferences.showCompleted
+        result.order = preferences.defaultPrimaryOrder.name
+        return result
+    }
+
+    fun setShowArchived(show: Boolean) {
+        preferences.showArchived = show
+    }
+
+    fun setShowCompleted(show: Boolean) {
+        preferences.showCompleted = show
+    }
+
+    /** [by] is "manual", "name", "color", "score" or "status"; repeating it reverses the order, as on Android. */
+    fun sortBy(by: String) {
+        when (by) {
+            "manual" -> preferences.defaultPrimaryOrder = HabitList.Order.BY_POSITION
+            "name" -> toggleOrder(HabitList.Order.BY_NAME_ASC, HabitList.Order.BY_NAME_DESC)
+            "color" -> toggleOrder(HabitList.Order.BY_COLOR_ASC, HabitList.Order.BY_COLOR_DESC)
+            "score" -> toggleOrder(HabitList.Order.BY_SCORE_DESC, HabitList.Order.BY_SCORE_ASC)
+            "status" -> toggleOrder(HabitList.Order.BY_STATUS_ASC, HabitList.Order.BY_STATUS_DESC)
+        }
+    }
+
+    // Same as ListHabitsMenuBehavior.onSortToggleBy
+    private fun toggleOrder(defaultOrder: HabitList.Order, reversedOrder: HabitList.Order) {
+        val primary = preferences.defaultPrimaryOrder
+        if (primary != defaultOrder) {
+            if (primary != reversedOrder) preferences.defaultSecondaryOrder = primary
+            preferences.defaultPrimaryOrder = defaultOrder
+        } else {
+            preferences.defaultPrimaryOrder = reversedOrder
+        }
+    }
+
+    /** Existing category names, for suggestions. */
+    fun categories(): Array<String> =
+        habitList.map { it.category.trim() }.filter { it.isNotEmpty() }.distinct().sorted().toTypedArray()
+
+    fun changeColor(ids: Array<Int>, colorIndex: Int) =
+        execute(ChangeHabitColorCommand(habitList, ids.map(::habit), PaletteColor(colorIndex)))
+
+    fun changeCategory(ids: Array<Int>, category: String) =
+        execute(ChangeHabitCategoryCommand(habitList, ids.map(::habit), category.trim()))
+
+    fun renameCategory(oldName: String, newName: String) =
+        execute(RenameCategoryCommand(habitList, oldName, newName.trim()))
+
+    /** True only on the very first launch; then starts the hints clock, like ListHabitsBehavior.onFirstRun. */
+    fun consumeFirstRun(): Boolean {
+        if (!preferences.isFirstRun) return false
+        preferences.isFirstRun = false
+        preferences.updateLastHint(-1, getToday())
+        return true
+    }
+
+    /** Android's "Did you know?" hints: at most one new hint per day, each shown once. */
+    fun nextHint(hints: Array<String>): String? {
+        val list = HintList(preferences, hints)
+        return if (list.shouldShow()) list.pop() else null
     }
 
     fun habitDetail(id: Int): dynamic {
@@ -163,6 +253,7 @@ class HabitsCore internal constructor(
         model.question = form.question.unsafeCast<String>()
         model.description = form.description.unsafeCast<String>()
         model.color = PaletteColor(form.colorIndex.unsafeCast<Int>())
+        model.category = form.category.unsafeCast<String?>()?.trim() ?: model.category
         model.frequency = Frequency(form.freqNum.unsafeCast<Int>(), form.freqDen.unsafeCast<Int>())
         model.type = if (form.numerical.unsafeCast<Boolean>()) HabitType.NUMERICAL else HabitType.YES_NO
         if (model.isNumerical) {
@@ -218,7 +309,7 @@ class HabitsCore internal constructor(
         val habit = habit(id)
         val ref = habit(refId)
         val target = if (before) ReorderTarget.Before(ref) else ReorderTarget.After(ref)
-        execute(ReorderHabitCommand(habitList, habit, target, habit.category))
+        execute(ReorderHabitCommand(habitList, habit, target, ref.category))
     }
 
     fun historyChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean, padding: Double): ChartHandle =

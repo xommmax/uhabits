@@ -54,14 +54,14 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
     if (id === null) {
       return {
         id: null, name: "", question: "", description: "", colorIndex: DEFAULT_COLOR,
-        freqNum: 1, freqDen: 1, numerical, unit: "", targetValue: 0, targetType: 0,
+        freqNum: 1, freqDen: 1, numerical, unit: "", targetValue: 0, targetType: 0, category: "",
       };
     }
     const h = core.habitDetail(id) as HabitDetail;
     return {
       id, name: h.name, question: h.question, description: h.description, colorIndex: h.colorIndex,
       freqNum: h.freqNum, freqDen: h.freqDen, numerical: h.numerical, unit: h.unit,
-      targetValue: h.targetValue, targetType: h.targetType,
+      targetValue: h.targetValue, targetType: h.targetType, category: h.category,
     };
   });
   const [targetText, setTargetText] = useState(form.numerical && form.id !== null ? String(form.targetValue) : "");
@@ -175,6 +175,19 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
             </div>
           </>
         )}
+
+        <div class="form-label">Category</div>
+        <div class="form-group">
+          <input
+            list="categories"
+            placeholder="(Optional)"
+            value={form.category}
+            onInput={(e) => update({ category: e.currentTarget.value })}
+          />
+          <datalist id="categories">
+            {core.categories().map((c) => <option value={c} />)}
+          </datalist>
+        </div>
 
         <div class="form-label">Notes</div>
         <div class="form-group">

@@ -27,8 +27,9 @@
   --sheet: rgba(249, 249, 249, 0.96);
   color-scheme: light dark;
 }
+/* Dark theme: follows the system unless chosen in the app (theme.ts sets data-theme). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #212121;
     --card: #303030;
     --text: #f2f2f2;
@@ -41,6 +42,24 @@
     --bar-bg: rgba(18, 18, 18, 0.92);
     --sheet: rgba(44, 44, 46, 0.96);
   }
+}
+:root[data-theme="dark"] {
+  --bg: #212121;
+  --card: #303030;
+  --text: #f2f2f2;
+  --muted: #8e8e93;
+  --faint: #424242;
+  --contrast40: #525252;
+  --separator: #3d3d3d;
+  --accent: #0a84ff;
+  --destructive: #ff453a;
+  --bar-bg: rgba(18, 18, 18, 0.92);
+  --sheet: rgba(44, 44, 46, 0.96);
+}
+/* Android's "pure black" option */
+:root.pure-black[data-theme="dark"] { --bg: #000000; --card: #000000; }
+@media (prefers-color-scheme: dark) {
+  :root.pure-black:not([data-theme="light"]) { --bg: #000000; --card: #000000; }
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -205,3 +224,43 @@ button:disabled { opacity: 0.35; cursor: default; }
 .type-title { font-weight: 600; margin-bottom: 4px; }
 .form-row select { font: inherit; border: 0; background: none; color: var(--accent); text-align: right; }
 .form-row input.wide { width: 50%; text-align: right; color: var(--text); }
+
+/* Main list: search, selection, categories, hints (Phase 3) */
+.fa-button { font-size: 18px; padding: 10px 7px; }
+.search-bar { display: flex; gap: 8px; align-items: center; grid-template-columns: none; }
+.search-input {
+  flex: 1; min-width: 0; font: inherit; border: 0; border-radius: 10px; padding: 8px 12px;
+  background: var(--faint); color: var(--text); outline: none; -webkit-appearance: none;
+}
+.category-header {
+  display: block; width: 100%; text-align: left; padding: 14px 12px 6px; font-size: 14px; font-weight: 600; color: var(--muted);
+}
+.habit-row.selected { background: color-mix(in srgb, var(--accent) 14%, var(--card)); }
+.habit-row.shifting { transition: transform 0.15s; }
+.habit-row.dragging { position: relative; z-index: 5; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); }
+.habit-name { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
+.hint-card { display: block; width: calc(100% - 16px); margin: 8px; padding: 12px 14px; text-align: left; background: var(--card); border-radius: 6px; font-size: 14px; }
+.hint-title { font-weight: 600; margin-bottom: 4px; }
+.color-picker, .category-dialog { width: 100%; max-width: 360px; background: var(--card); border-radius: 14px; padding: 16px; }
+.color-picker .swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+.dialog-title { font-weight: 600; font-size: 17px; margin-bottom: 12px; }
+.dialog-input {
+  width: 100%; font: inherit; border: 0; border-radius: 8px; padding: 10px 12px; background: var(--bg); color: var(--text); outline: none;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.chip { padding: 5px 10px; border-radius: 14px; background: var(--bg); font-size: 14px; }
+.dialog-buttons { display: flex; justify-content: flex-end; gap: 20px; margin-top: 16px; color: var(--accent); }
+.dialog-buttons .bold { font-weight: 600; }
+
+/* First-run intro (Android's IntroActivity) */
+.intro { position: fixed; inset: 0; z-index: 40; color: #fff; display: flex; flex-direction: column; padding: env(safe-area-inset-top) 0 env(safe-area-inset-bottom); }
+.intro-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; gap: 24px; }
+.intro-body h1 { margin: 0; font-size: 26px; }
+.intro-body img { width: 60%; max-width: 240px; }
+.intro-body p { margin: 0; font-size: 17px; max-width: 320px; }
+.intro-footer { display: flex; justify-content: space-between; align-items: center; padding: 16px 24px; }
+.intro-footer button { color: #fff; min-width: 60px; padding: 10px 0; }
+.intro-footer .bold { font-weight: 600; text-align: right; }
+.intro-dots { display: flex; gap: 8px; }
+.intro-dots span { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.4); }
+.intro-dots span.active { background: #fff; }
