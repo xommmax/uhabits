@@ -25,6 +25,8 @@
   --destructive: #ff3b30;
   --toolbar: #363636;
   --menu: #ffffff;
+  --field-bg: #ffffff;
+  --field-line: #e0e0e0;
   color-scheme: light dark;
 }
 /* Dark theme: follows the system unless chosen in the app (theme.ts sets data-theme). */
@@ -41,6 +43,8 @@
     --destructive: #ff453a;
     --toolbar: #101010;
     --menu: #424242;
+    --field-bg: #212121;
+    --field-line: #424242;
   }
 }
 :root[data-theme="dark"] {
@@ -55,11 +59,13 @@
   --destructive: #ff453a;
   --toolbar: #101010;
   --menu: #424242;
+  --field-bg: #212121;
+  --field-line: #424242;
 }
 /* Android's "pure black" option */
-:root.pure-black[data-theme="dark"] { --bg: #000000; --card: #000000; --toolbar: #000000; }
+:root.pure-black[data-theme="dark"] { --bg: #000000; --card: #000000; --toolbar: #000000; --field-bg: #000000; }
 @media (prefers-color-scheme: dark) {
-  :root.pure-black:not([data-theme="light"]) { --bg: #000000; --card: #000000; --toolbar: #000000; }
+  :root.pure-black:not([data-theme="light"]) { --bg: #000000; --card: #000000; --toolbar: #000000; --field-bg: #000000; }
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -84,6 +90,7 @@ button:disabled { opacity: 0.35; cursor: default; }
   background: var(--toolbar); color: #fff;
 }
 .topbar.no-left { padding-left: max(16px, env(safe-area-inset-left)); }
+.topbar:not(.no-left) .topbar-title { padding-left: 16px; }
 .topbar-title { flex: 1; min-width: 0; font-size: 20px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .topbar-right { display: flex; align-items: center; flex: none; }
 .bar-button { color: #fff; min-width: 48px; min-height: 48px; display: flex; align-items: center; justify-content: center; }
@@ -174,15 +181,12 @@ button:disabled { opacity: 0.35; cursor: default; }
 .form { padding: 16px max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left)); }
 .form-label { font-size: 13px; text-transform: uppercase; color: var(--muted); margin: 20px 16px 6px; }
 .form-group { background: var(--card); border-radius: 10px; overflow: hidden; }
-.form-group > input, .form-group > select, .form-group > textarea, .form-row {
+.form-group > input, .form-group > select, .form-group > textarea {
   display: block; width: 100%; border: 0; background: none; color: var(--text);
   font: inherit; padding: 12px 16px; border-bottom: 0.5px solid var(--separator);
   -webkit-appearance: none; appearance: none; outline: none;
 }
 .form-group > :last-child { border-bottom: 0; }
-.form-group textarea { resize: vertical; }
-.form-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-.form-row input { width: 64px; text-align: right; font: inherit; border: 0; background: none; color: var(--accent); outline: none; }
 .swatches { display: grid; grid-template-columns: repeat(10, 1fr); gap: 8px; padding: 14px; }
 .swatch { aspect-ratio: 1; border-radius: 50%; }
 .swatch.selected { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--text); }
@@ -240,8 +244,6 @@ button:disabled { opacity: 0.35; cursor: default; }
 .type-picker button { display: block; width: 100%; text-align: left; padding: 16px; border-bottom: 0.5px solid var(--separator); }
 .type-picker button:last-child { border-bottom: 0; }
 .type-title { font-weight: 600; margin-bottom: 4px; }
-.form-row select { font: inherit; border: 0; background: none; color: var(--accent); text-align: right; }
-.form-row input.wide { width: 50%; text-align: right; color: var(--text); }
 
 /* Main list: selection, categories, hints (Phase 3) */
 .fa-button { font-size: 18px; min-width: 40px; }
@@ -298,3 +300,54 @@ button:disabled { opacity: 0.35; cursor: default; }
 .about-header { text-align: center; padding: 16px 0 4px; display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .about-header img { border-radius: 16px; }
 .about-header h1 { font-size: 22px; margin: 6px 0 0; }
+
+/* Create/edit habit (Android's activity_edit_habit.xml and FormOuterBox/FormInnerBox/FormLabel styles) */
+.edit-screen { background: var(--field-bg); }
+.outlined-button {
+  margin-right: 12px; padding: 0 16px; height: 36px; border: 1px solid #fff; border-radius: 4px;
+  color: #fff; font-size: 14px; font-weight: 500; letter-spacing: 1.25px; text-transform: uppercase;
+}
+.edit-form { padding: 8px max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left)); }
+.field-row { display: flex; }
+.field { flex: 1; min-width: 0; display: flex; flex-direction: column; padding: 4px 4px 8px; }
+.field.narrow { flex: none; width: 80px; }
+.field-box {
+  position: relative; flex: 1; display: flex; flex-direction: column; padding-top: 8px;
+  background: var(--field-bg); border: 1px solid var(--field-line); border-radius: 4px;
+}
+.field.error .field-box { border-color: var(--destructive); }
+.field-label { align-self: flex-start; margin: -15px 0 -4px 8px; padding: 0 8px; background: var(--field-bg); font-size: 12px; line-height: 16px; }
+.field-error { position: absolute; right: 12px; top: 50%; padding-top: 4px; font-size: 12px; color: var(--destructive); pointer-events: none; }
+.field-input {
+  display: block; width: 100%; padding: 16px; border: 0; background: none; color: var(--text);
+  font: inherit; font-size: 16px; line-height: 22px; outline: none; resize: none; -webkit-appearance: none; appearance: none;
+}
+.field-input::placeholder { color: var(--muted); }
+.field-dropdown {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+  padding: 16px 12px 14px 16px; font-size: 16px; line-height: 22px; text-align: left;
+}
+.field-dropdown .material-icon { flex: none; color: var(--muted); }
+.color-button { flex: 1; min-height: 20px; margin: 12px 20px; border-radius: 2px; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }
+
+/* Android's AlertDialog, list dialogs and FrequencyPickerDialog */
+.overlay.dim { background: rgba(0, 0, 0, 0.6); }
+.android-dialog { width: 100%; max-width: 360px; background: var(--menu); color: var(--text); border-radius: 2px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3); }
+.list-dialog { padding: 8px 0; }
+.list-dialog-item { display: block; width: 100%; padding: 0 24px; min-height: 64px; text-align: left; font-size: 22px; }
+.list-dialog-item:active, .frequency-row:active { background: rgba(128, 128, 128, 0.15); }
+.frequency-dialog { padding: 16px 16px 0; font-size: 16px; }
+.frequency-row { display: flex; align-items: center; gap: 8px; height: 48px; }
+.radio {
+  flex: none; width: 20px; height: 20px; margin: 0 20px 0 6px; border: 2px solid var(--muted); border-radius: 50%;
+  -webkit-appearance: none; appearance: none; display: grid; place-items: center;
+}
+.radio:checked { border-color: #1976d2; }
+.radio:checked::after { content: ""; width: 10px; height: 10px; border-radius: 50%; background: #1976d2; }
+.frequency-input {
+  width: 50px; height: 40px; border: 1px solid var(--field-line); border-radius: 4px; background: var(--field-bg);
+  color: var(--text); font: inherit; font-size: 18px; text-align: center; outline: none;
+}
+.frequency-input:focus { border-color: #1976d2; }
+.dialog-actions { display: flex; justify-content: flex-end; padding: 8px 0 8px; }
+.dialog-action { padding: 0 8px; min-height: 48px; font-size: 14px; font-weight: 500; letter-spacing: 1.25px; text-transform: uppercase; }

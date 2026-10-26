@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import confetti from "canvas-confetti";
 import type { HabitsCore } from "./core";
-import { Entry } from "./format";
+import { Entry, PALETTE } from "./format";
 import { getBool, Pref } from "./prefs";
 
 // Ports of Android's CheckmarkDialog and NumberDialog (checkmark_popup.xml).
@@ -186,6 +186,22 @@ export function HabitTypePicker(props: { onPick: (numerical: boolean) => void; o
           <div class="type-title">Measurable</div>
           <div class="muted">e.g. How many miles did you run today? How many pages did you read?</div>
         </button>
+      </div>
+    </div>
+  );
+}
+
+/** Android's ColorPickerDialog: the 20 palette colors. */
+export function ColorPicker(props: { selected?: number; onPick: (index: number) => void; onClose: () => void }) {
+  return (
+    <div class="overlay center" onClick={props.onClose}>
+      <div class="color-picker" onClick={(e) => e.stopPropagation()}>
+        <div class="dialog-title">Change color</div>
+        <div class="swatches">
+          {PALETTE.map((hex, i) => (
+            <button class={`swatch${props.selected === i ? " selected" : ""}`} style={{ background: hex }} aria-label={`Color ${i + 1}`} onClick={() => props.onPick(i)} />
+          ))}
+        </div>
       </div>
     </div>
   );

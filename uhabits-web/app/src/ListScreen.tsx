@@ -3,8 +3,8 @@ import type { HabitsCore } from "./core";
 import type { HabitRow } from "./types";
 import { BarIcon, FA, Icon, Menu, type MenuItem, Ring, TopBar, useDarkMode } from "./components";
 import { shareBackup, shouldRemind, snoozeReminder } from "./backup";
-import { Entry, formatDay, PALETTE, shortNumber } from "./format";
-import { celebrate, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
+import { Entry, formatDay, shortNumber } from "./format";
+import { celebrate, ColorPicker, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
 import { getBool, Pref } from "./prefs";
 import { isNightMode, toggleNightMode } from "./theme";
 
@@ -12,7 +12,6 @@ import { isNightMode, toggleNightMode } from "./theme";
 const COLUMN_WIDTH = 48;
 const NAME_MIN_WIDTH = 160;
 const LONG_PRESS_MS = 500;
-const HELP_URL = "https://loophabits.org/faq.html";
 
 // Android's res/values/strings.xml "hints" array
 const HINTS = [
@@ -239,7 +238,6 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   const menuItems: MenuItem[] = [
     { label: "Dark theme", checked: isNightMode(), onClick: toggleNightMode },
     { label: "Settings", onClick: onSettings },
-    { label: "Help & FAQ", onClick: () => window.open(HELP_URL, "_blank") },
     { label: "About", onClick: onAbout },
   ];
 
@@ -465,22 +463,6 @@ function NumberCell(props: { value: number; completed: boolean; unit: string; co
       <span class="number">{label}</span>
       {unit.trim() && <span class="unit">{unit}</span>}
     </span>
-  );
-}
-
-/** Android's ColorPickerDialog: the 20 palette colors. */
-function ColorPicker(props: { onPick: (index: number) => void; onClose: () => void }) {
-  return (
-    <div class="overlay center" onClick={props.onClose}>
-      <div class="color-picker" onClick={(e) => e.stopPropagation()}>
-        <div class="dialog-title">Change color</div>
-        <div class="swatches">
-          {PALETTE.map((hex, i) => (
-            <button class="swatch" style={{ background: hex }} aria-label={`Color ${i + 1}`} onClick={() => props.onPick(i)} />
-          ))}
-        </div>
-      </div>
-    </div>
   );
 }
 
