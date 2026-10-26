@@ -80,6 +80,16 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
     }
   };
 
+  const calendarCard = (
+    <section class="card">
+      <div class="card-header">
+        <h2 style={titleStyle}>Calendar</h2>
+        <button class="card-action" onClick={() => setEditingHistory(true)}>Edit</button>
+      </div>
+      <Chart height={CALENDAR_HEIGHT} deps={[id, rev, dark]} create={(c) => calendar(c, 0)} readOnly />
+    </section>
+  );
+
   return (
     <div
       class="screen"
@@ -122,6 +132,7 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
           </section>
         )}
 
+        {habit.numerical && calendarCard}
         {habit.numerical ? (
           <section class="card">
             <h2 style={titleStyle}>Target</h2>
@@ -151,14 +162,7 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
             </div>
           </section>
         )}
-
-        <section class="card">
-          <div class="card-header">
-            <h2 style={titleStyle}>Calendar</h2>
-            <button class="card-action" onClick={() => setEditingHistory(true)}>Edit</button>
-          </div>
-          <Chart height={CALENDAR_HEIGHT} deps={[id, rev, dark]} create={(c) => calendar(c, 0)} readOnly />
-        </section>
+        {!habit.numerical && calendarCard}
 
         <section class="card">
           <div class="card-header">
