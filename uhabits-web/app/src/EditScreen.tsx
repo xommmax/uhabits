@@ -41,6 +41,7 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
   const [targetText, setTargetText] = useState(form.numerical && form.id !== null ? String(form.targetValue) : "");
   const [dialog, setDialog] = useState<Dialog>(null);
   const [showErrors, setShowErrors] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(false);
   const update = (patch: Partial<HabitForm>) => setForm({ ...form, ...patch });
 
   const target = Number(targetText.replace(",", "."));
@@ -64,6 +65,10 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
     });
     onDone();
   };
+
+  // Existing categories that start with what was typed, shown as chips while the field has focus
+  const typed = form.category.trim().toLowerCase();
+  const categorySuggestions = editingCategory ? core.categories().filter((c) => c !== form.category && c.toLowerCase().startsWith(typed)) : [];
 
   const numericalFrequency = NUMERICAL_FREQUENCIES.find(([den]) => den === form.freqDen)?.[1] ?? `${form.freqNum}/${form.freqDen}`;
 
@@ -125,10 +130,22 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
           <AutoGrow placeholder="(Optional)" value={form.description} onInput={(description) => update({ description })} />
         </Field>
         <Field label="Category">
-          <input class="field-input" list="categories" placeholder="(Optional)" value={form.category} onInput={(e) => update({ category: e.currentTarget.value })} />
-          <datalist id="categories">
-            {core.categories().map((c) => <option value={c} />)}
-          </datalist>
+          <input
+            class="field-input"
+            placeholder="(Optional)"
+            value={form.category}
+            onFocus={() => setEditingCategory(true)}
+            onBlur={() => setEditingCategory(false)}
+            onInput={(e) => update({ category: e.currentTarget.value })}
+          />
+          {categorySuggestions.length > 0 && (
+            <div class="chips field-chips">
+              {categorySuggestions.map((c) => (
+                // preventDefault keeps the focus in the field, so the chips stay until one is picked
+                <button class="chip" onMouseDown={(e) => e.preventDefault()} onClick={() => update({ category: c })}>{c}</button>
+              ))}
+            </div>
+          )}
         </Field>
       </div>
 
