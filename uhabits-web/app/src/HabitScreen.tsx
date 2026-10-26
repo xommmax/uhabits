@@ -131,12 +131,10 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
           <section class="card">
             <h2 style={titleStyle}>Overview</h2>
             <div class="overview">
-              <div class="overview-item ring-item">
-                <Ring value={habit.score} color={color} size={30} thickness={5} />
-                <div>
-                  <div class="overview-value" style={titleStyle}>{Math.round(habit.score * 100)}%</div>
-                  <div class="muted">Score</div>
-                </div>
+              <div class="overview-ring"><Ring value={habit.score} color={color} size={30} thickness={5} /></div>
+              <div class="overview-item">
+                <div class="overview-value" style={titleStyle}>{Math.round(habit.score * 100)}%</div>
+                <div class="muted">Score</div>
               </div>
               <div class="overview-item">
                 <div class="overview-value" style={diffStyle(habit.scoreMonthDiff)}>{percentageDiff(habit.scoreMonthDiff)}</div>
@@ -156,6 +154,14 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
 
         <section class="card">
           <div class="card-header">
+            <h2 style={titleStyle}>Calendar</h2>
+            <button class="card-action" onClick={() => setEditingHistory(true)}>Edit</button>
+          </div>
+          <Chart height={CALENDAR_HEIGHT} deps={[id, rev, dark]} create={(c) => calendar(c, 0)} readOnly />
+        </section>
+
+        <section class="card">
+          <div class="card-header">
             <h2 style={titleStyle}>Score</h2>
             <Spinner options={SCORE_BUCKETS} value={scoreBucket} onChange={setScoreBucket} />
           </div>
@@ -170,13 +176,6 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
           <Chart height={BAR_HEIGHT} deps={[id, rev, dark, barBucket]} create={(c) => core.barChart(c, id, dark, barBucket)} />
         </section>
 
-        <section class="card">
-          <div class="card-header">
-            <h2 style={titleStyle}>Calendar</h2>
-            <button class="card-action" onClick={() => setEditingHistory(true)}>Edit</button>
-          </div>
-          <Chart height={CALENDAR_HEIGHT} deps={[id, rev, dark]} create={(c) => calendar(c, 0)} />
-        </section>
 
         {habit.streakCount > 0 && (
           <section class="card">
@@ -198,6 +197,7 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
               height={CALENDAR_EDITOR_HEIGHT}
               deps={[id, rev, dark]}
               create={(c) => calendar(c, 10)}
+              keepScroll
             />
             <button class="sheet-item bold" onClick={() => setEditingHistory(false)}>Done</button>
           </div>

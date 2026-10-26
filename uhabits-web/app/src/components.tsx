@@ -127,19 +127,30 @@ const LONG_PRESS_MS = 500;
 
 /**
  * Canvas showing a core chart. Drag sideways to scroll back in time, tap to
- * click (e.g. toggle a day in the calendar).
+ * click (e.g. toggle a day in the calendar) unless [readOnly]. With
+ * [keepScroll], the chart stays scrolled where it was when its data changes.
  */
-export function Chart(props: { create: (canvas: HTMLCanvasElement) => ChartHandle; deps: unknown[]; height: number }) {
+export function Chart(props: {
+  create: (canvas: HTMLCanvasElement) => ChartHandle;
+  deps: unknown[];
+  height: number;
+  readOnly?: boolean;
+  keepScroll?: boolean;
+}) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<ChartHandle | null>(null);
   const drag = useRef({ startX: 0, columns: 0, moved: false, active: false, longPressed: false });
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
+  // Columns scrolled back in time, mirroring the view's dataOffset (never below 0)
+  const scrolled = useRef(0);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const handle = props.create(canvas);
     handleRef.current = handle;
     handle.draw();
+    if (props.keepScroll && scrolled.current > 0) handle.scrollBy(scrolled.current);
+    else scrolled.current = 0;
     const observer = new ResizeObserver(() => handle.draw());
     observer.observe(canvas);
     return () => observer.disconnect();
@@ -151,6 +162,7 @@ export function Chart(props: { create: (canvas: HTMLCanvasElement) => ChartHandl
     const rect = canvasRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
+    if (props.readOnly) return;
     longPressTimer.current = setTimeout(() => {
       if (drag.current.moved || !drag.current.active) return;
       drag.current.longPressed = true;
@@ -168,7 +180,7 @@ export function Chart(props: { create: (canvas: HTMLCanvasElement) => ChartHandl
     }
     const columns = Math.round(dx / handle.columnWidth);
     if (columns !== d.columns) {
-      handle.scrollBy(columns - d.columns);
+      if (handle.scrollBy(columns - d.columns)) scrolled.current = Math.max(0, scrolled.current + columns - d.columns);
       d.columns = columns;
     }
   };
@@ -176,7 +188,7 @@ export function Chart(props: { create: (canvas: HTMLCanvasElement) => ChartHandl
     const d = drag.current;
     d.active = false;
     clearTimeout(longPressTimer.current);
-    if (d.moved || d.longPressed || !handleRef.current) return;
+    if (props.readOnly || d.moved || d.longPressed || !handleRef.current) return;
     const rect = canvasRef.current!.getBoundingClientRect();
     handleRef.current.click(e.clientX - rect.left, e.clientY - rect.top);
   };
