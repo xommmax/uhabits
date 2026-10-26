@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitRow } from "./types";
 import { BarIcon, FA, Icon, Menu, type MenuItem, Ring, TopBar, useDarkMode } from "./components";
-import { daysSinceBackup, shareBackup, shouldRemind, snoozeReminder } from "./backup";
+import { shareBackup, shouldRemind, snoozeReminder } from "./backup";
 import { Entry, formatDay, PALETTE, shortNumber } from "./format";
 import { celebrate, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
 import { getBool, Pref } from "./prefs";
@@ -33,19 +33,6 @@ function useDayColumns(): number {
   return n;
 }
 
-function lastBackupText(): string {
-  const days = daysSinceBackup();
-  if (days === null) return "No backup yet";
-  if (days === 0) return "Last backup: today";
-  return `Last backup: ${days} day${days === 1 ? "" : "s"} ago`;
-}
-
-function versionText(): string {
-  const { version, commit, time } = __BUILD_INFO__;
-  const built = new Date(time).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false });
-  return `Version ${version} (${commit}) · built ${built}`;
-}
-
 // While a habit is being dragged, stop the page from scrolling (iOS needs a non-passive listener).
 let dragging = false;
 document.addEventListener("touchmove", (e) => dragging && e.preventDefault(), { passive: false });
@@ -74,7 +61,6 @@ type Dialog =
 export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, onSettings, onAbout }: Props) {
   const dark = useDarkMode();
   const columns = useDayColumns();
-  const [query, setQuery] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [dialog, setDialog] = useState<Dialog>(null);
   const [popup, setPopup] = useState<PopupRequest | null>(null);
@@ -84,7 +70,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   const rowRefs = useRef(new Map<number, HTMLDivElement>());
   void rev;
 
-  const habits = core.listHabits(query ?? "", columns) as HabitRow[];
+  const habits = core.listHabits("", columns) as HabitRow[];
   const options = core.listOptions() as { showArchived: boolean; showCompleted: boolean; order: string; hasHabits: boolean };
   const manualOrder = options.order === "BY_POSITION";
   const today = core.today();
@@ -120,7 +106,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
     return 0;
   };
   const startDrag = (id: number) => {
-    if (!manualOrder || query) return;
+    if (!manualOrder) return;
     const rects = habits.map((h) => rowRefs.current.get(h.id)!.getBoundingClientRect());
     dragging = true;
     setDrag({ id, dy: 0, rects, start: habits.findIndex((h) => h.id === id) });
@@ -169,7 +155,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
     refresh();
   };
 
-  // --- Top bar: normal, search, or selection mode ---
+  // --- Top bar: normal or selection mode ---
   let topBar;
   if (selecting) {
     const canArchive = selectedHabits.every((h) => !h.archived);
@@ -190,24 +176,10 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
         }
       />
     );
-  } else if (query !== null) {
-    topBar = (
-      <header class="topbar search-bar">
-        <input
-          class="search-input"
-          type="search"
-          placeholder="Search"
-          autoFocus
-          value={query}
-          onInput={(e) => setQuery(e.currentTarget.value)}
-        />
-        <button class="bar-button text" onClick={() => setQuery(null)}>Cancel</button>
-      </header>
-    );
   } else {
     topBar = (
       <TopBar
-        title="Habits"
+        title="Alichka Habits"
         right={
           <>
             <BarIcon name="add" label="Add habit" onClick={() => setDialog({ kind: "type" })} />
@@ -302,14 +274,14 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
 
       {habits.length === 0 && (
         <div class="empty">
-          <span class="fa empty-icon">{options.hasHabits && !query ? ICON.umbrellaBeach : ICON.starHalf}</span>
-          <p>{query ? "No habits found." : options.hasHabits ? "You're all done for today!" : "You have no active habits"}</p>
+          <span class="fa empty-icon">{options.hasHabits ? ICON.umbrellaBeach : ICON.starHalf}</span>
+          <p>{options.hasHabits ? "You're all done for today!" : "You have no active habits"}</p>
         </div>
       )}
 
       {popup && <EntryPopup core={core} request={popup} onClose={(changed) => { setPopup(null); if (changed) refresh(); }} />}
       {dialog?.kind === "type" && <HabitTypePicker onClose={() => setDialog(null)} onPick={(numerical) => { setDialog(null); onAdd(numerical); }} />}
-      {dialog?.kind === "menu" && <Menu onClose={() => setDialog(null)} footer={`${lastBackupText()}\n${versionText()}`} items={menuItems} />}
+      {dialog?.kind === "menu" && <Menu onClose={() => setDialog(null)} items={menuItems} />}
       {dialog?.kind === "filter" && (
         <Menu
           onClose={() => setDialog(null)}
@@ -317,7 +289,6 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
             { label: "Hide archived", checked: !options.showArchived, onClick: () => { core.setShowArchived(!options.showArchived); refresh(); } },
             { label: "Hide completed", checked: !options.showCompleted, onClick: () => { core.setShowCompleted(!options.showCompleted); refresh(); } },
             { label: "Sort", submenu: true, onClick: () => setDialog({ kind: "sort" }) },
-            { label: "Search", onClick: () => setQuery("") },
           ]}
         />
       )}

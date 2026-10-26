@@ -70,7 +70,7 @@ export interface MenuItem {
 }
 
 /** Android-style popup menu in the top-right corner, over the toolbar button that opened it. */
-export function Menu(props: { items: MenuItem[]; footer?: string; onClose: () => void }) {
+export function Menu(props: { items: MenuItem[]; onClose: () => void }) {
   return (
     <div class="menu-overlay" onClick={props.onClose}>
       <div class="menu" onClick={(e) => e.stopPropagation()}>
@@ -87,7 +87,6 @@ export function Menu(props: { items: MenuItem[]; footer?: string; onClose: () =>
             {item.submenu && <span class="menu-arrow" />}
           </button>
         ))}
-        {props.footer && <div class="menu-footer">{props.footer}</div>}
       </div>
     </div>
   );

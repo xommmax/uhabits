@@ -212,7 +212,6 @@ button:disabled { opacity: 0.35; cursor: default; }
   background: #1976d2 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z' fill='white'/%3E%3C/svg%3E") center / 16px no-repeat;
 }
 .menu-arrow { flex: none; width: 0; height: 0; border-style: solid; border-width: 5px 0 5px 6px; border-color: transparent transparent transparent currentColor; opacity: 0.6; }
-.menu-footer { margin-top: 6px; padding: 8px 16px 4px; border-top: 1px solid var(--separator); font-size: 12px; color: var(--muted); white-space: pre-line; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(32px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30;
@@ -243,14 +242,8 @@ button:disabled { opacity: 0.35; cursor: default; }
 .form-row select { font: inherit; border: 0; background: none; color: var(--accent); text-align: right; }
 .form-row input.wide { width: 50%; text-align: right; color: var(--text); }
 
-/* Main list: search, selection, categories, hints (Phase 3) */
+/* Main list: selection, categories, hints (Phase 3) */
 .fa-button { font-size: 18px; min-width: 40px; }
-.search-bar { padding-left: max(12px, env(safe-area-inset-left)); }
-.search-input {
-  flex: 1; min-width: 0; font: inherit; border: 0; border-radius: 6px; padding: 8px 12px;
-  background: rgba(255, 255, 255, 0.15); color: #fff; outline: none; -webkit-appearance: none;
-}
-.search-input::placeholder { color: rgba(255, 255, 255, 0.6); }
 .category-header {
   display: block; width: 100%; text-align: left; padding: 14px 12px 6px; font-size: 14px; font-weight: 600; color: var(--muted);
 }
