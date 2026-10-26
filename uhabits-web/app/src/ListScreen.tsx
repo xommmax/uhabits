@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitRow } from "./types";
-import { BarIcon, FA, Icon, Menu, type MenuItem, Ring, TopBar, useDarkMode } from "./components";
+import { BarIcon, Menu, type MenuItem, Ring, TopBar, useDarkMode } from "./components";
 import { shareBackup, shouldRemind, snoozeReminder } from "./backup";
 import { Entry, formatDay, shortNumber } from "./format";
 import { celebrate, ColorPicker, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
@@ -19,8 +19,8 @@ const HINTS = [
   "You can see more days by putting your phone in landscape mode.",
 ];
 
-// FontAwesome glyphs used by Android's selection menu and empty list (EmptyListView)
-const ICON = { starHalf: "", umbrellaBeach: "", edit: "", color: "", archive: "", unarchive: "", delete: "" };
+// FontAwesome glyphs of Android's empty list (EmptyListView)
+const ICON = { starHalf: "", umbrellaBeach: "" };
 
 function useDayColumns(): number {
   // Same rule as ListHabitsRootView.getCheckmarkCount
@@ -58,6 +58,7 @@ type Dialog =
   | { kind: "filter" }
   | { kind: "sort" }
   | { kind: "color" }
+  | { kind: "selectionMenu" }
   | { kind: "category"; title: string; initial: string; onSave: (name: string) => void }
   | { kind: "type" }
   | null;
@@ -161,21 +162,27 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
 
   // --- Top bar: normal or selection mode ---
   let topBar;
+  let selectionMenu: MenuItem[] = [];
   if (selecting) {
     const canArchive = selectedHabits.every((h) => !h.archived);
     const canUnarchive = selectedHabits.every((h) => h.archived);
+    // Android's ListHabitsSelectionMenu: edit and color as icons, the rest in the overflow menu
+    selectionMenu = [
+      ...(canArchive ? [{ label: "Archive", onClick: () => { core.archive(ids()); afterBulk(); } }] : []),
+      ...(canUnarchive ? [{ label: "Unarchive", onClick: () => { core.unarchive(ids()); afterBulk(); } }] : []),
+      { label: "Categorize", onClick: categorize },
+      { label: "Delete", onClick: deleteSelected },
+    ];
     topBar = (
       <TopBar
+        color="var(--action-mode)"
         left={<BarIcon name="back" label="Cancel" onClick={clearSelection} />}
-        title={`${selected.size} selected`}
+        title={String(selected.size)}
         right={
           <>
-            {selected.size === 1 && <button class="bar-button fa-button" aria-label="Edit" onClick={() => { const [id] = ids(); clearSelection(); onEdit(id); }}><Icon glyph={ICON.edit} /></button>}
-            <button class="bar-button fa-button" aria-label="Change color" onClick={() => setDialog({ kind: "color" })}><Icon glyph={ICON.color} /></button>
-            {canArchive && <button class="bar-button fa-button" aria-label="Archive" onClick={() => { core.archive(ids()); afterBulk(); }}><Icon glyph={ICON.archive} /></button>}
-            {canUnarchive && <button class="bar-button fa-button" aria-label="Unarchive" onClick={() => { core.unarchive(ids()); afterBulk(); }}><Icon glyph={ICON.unarchive} /></button>}
-            <button class="bar-button fa-button" aria-label="Categorize" onClick={categorize}><Icon glyph={FA.tag} /></button>
-            <button class="bar-button fa-button" aria-label="Delete" onClick={deleteSelected}><Icon glyph={ICON.delete} /></button>
+            {selected.size === 1 && <BarIcon name="edit" label="Edit" onClick={() => { const [id] = ids(); clearSelection(); onEdit(id); }} />}
+            <BarIcon name="palette" label="Change color" onClick={() => setDialog({ kind: "color" })} />
+            <BarIcon name="more" label="More options" onClick={() => setDialog({ kind: "selectionMenu" })} />
           </>
         }
       />
@@ -285,6 +292,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
       {popup && <EntryPopup core={core} request={popup} onClose={(changed) => { setPopup(null); if (changed) refresh(); }} />}
       {dialog?.kind === "type" && <HabitTypePicker onClose={() => setDialog(null)} onPick={(numerical) => { setDialog(null); onAdd(numerical); }} />}
       {dialog?.kind === "menu" && <Menu onClose={() => setDialog(null)} items={menuItems} />}
+      {dialog?.kind === "selectionMenu" && <Menu onClose={() => setDialog(null)} items={selectionMenu} />}
       {dialog?.kind === "filter" && (
         <Menu
           onClose={() => setDialog(null)}

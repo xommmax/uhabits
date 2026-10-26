@@ -24,6 +24,7 @@
   --accent: #007aff;
   --destructive: #ff3b30;
   --toolbar: #363636;
+  --action-mode: #616161;
   --menu: #ffffff;
   --field-bg: #ffffff;
   --field-line: #e0e0e0;
@@ -42,6 +43,7 @@
     --accent: #0a84ff;
     --destructive: #ff453a;
     --toolbar: #101010;
+    --action-mode: #424242;
     --menu: #424242;
     --field-bg: #212121;
     --field-line: #424242;
@@ -58,6 +60,7 @@
   --accent: #0a84ff;
   --destructive: #ff453a;
   --toolbar: #101010;
+  --action-mode: #424242;
   --menu: #424242;
   --field-bg: #212121;
   --field-line: #424242;
@@ -252,7 +255,6 @@ button:disabled { opacity: 0.35; cursor: default; }
 .type-title { font-weight: 600; margin-bottom: 4px; }
 
 /* Main list: selection, categories, hints (Phase 3) */
-.fa-button { font-size: 18px; min-width: 40px; }
 .category-header {
   display: block; width: 100%; text-align: left; padding: 14px 12px 6px; font-size: 14px; font-weight: 600; color: var(--muted);
 }
