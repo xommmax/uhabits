@@ -24,8 +24,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["apple-touch-icon.png"],
       manifest: {
-        name: "Loop Habit Tracker",
-        short_name: "Habits",
+        name: "Alichka Habits",
+        short_name: "Alichka Habits",
         description: "Loop Habit Tracker, ported from Android",
         display: "standalone",
         background_color: "#f4f4f4",
