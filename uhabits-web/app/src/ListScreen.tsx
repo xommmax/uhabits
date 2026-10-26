@@ -8,8 +8,9 @@ import { celebrate, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePr
 import { getBool, Pref } from "./prefs";
 import { isNightMode, toggleNightMode } from "./theme";
 
-const COLUMN_WIDTH = 44;
-const NAME_MIN_WIDTH = 150;
+// Android's checkmarkWidth and habitNameWidth (res/values/dimens.xml)
+const COLUMN_WIDTH = 48;
+const NAME_MIN_WIDTH = 160;
 const LONG_PRESS_MS = 500;
 const HELP_URL = "https://loophabits.org/faq.html";
 
@@ -23,7 +24,11 @@ const HINTS = [
 const ICON = { starHalf: "", umbrellaBeach: "", edit: "", color: "", archive: "", unarchive: "", delete: "" };
 
 function useDayColumns(): number {
-  const compute = () => Math.max(3, Math.min(14, Math.floor((window.innerWidth - NAME_MIN_WIDTH - 24) / COLUMN_WIDTH)));
+  // Same rule as ListHabitsRootView.getCheckmarkCount
+  const compute = () => {
+    const nameWidth = Math.max(window.innerWidth / 3, NAME_MIN_WIDTH);
+    return Math.max(3, Math.min(14, Math.floor((window.innerWidth - nameWidth) / COLUMN_WIDTH)));
+  };
   const [n, setN] = useState(compute);
   useEffect(() => {
     const onResize = () => setN(compute());
@@ -100,7 +105,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   })();
   const dragShift = (i: number) => {
     if (!drag || i === drag.start) return 0;
-    const h = drag.rects[drag.start].height + 4;
+    const h = drag.rects[drag.start].height + 3;
     if (drag.start < i && i <= dragTarget) return -h;
     if (dragTarget <= i && i < drag.start) return h;
     return 0;
@@ -382,7 +387,7 @@ function HabitRowView(props: RowProps) {
         }}
         onContextMenu={(e) => e.preventDefault()}
       >
-        <Ring value={habit.score} color={color} />
+        <Ring value={habit.score} color={color} size={15} thickness={3} />
         <span style={{ color }}>{habit.name}</span>
       </button>
       {props.dayIndexes.map((i) => (
