@@ -26,6 +26,7 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
           <img src="icon-192.png" alt="" width={72} height={72} />
           <h1>Loop Habit Tracker</h1>
           <div class="muted">Version {version} ({commit}) · built {built}</div>
+          <div class="muted">by Masichek with Love</div>
           <div class="muted">iPhone web version, built on the Android app's open-source code (GPLv3).</div>
         </div>
 

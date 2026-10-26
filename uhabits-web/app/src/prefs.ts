@@ -31,7 +31,13 @@ export const Pref = {
   midnightDelay: "pref_midnight_delay",
 } as const;
 
-/** Tap toggles by default here (Android's "Toggle with short press" on), as agreed for the iPhone. */
+/**
+ * Defaults chosen for this app, applied to any preference not set yet:
+ * tap toggles, days in reverse order, and weeks starting on Monday.
+ */
 export function applyDefaults() {
-  if (localStorage.getItem(key(Pref.shortToggle)) === null) setBool(Pref.shortToggle, true);
+  const unset = (name: string) => localStorage.getItem(key(name)) === null;
+  if (unset(Pref.shortToggle)) setBool(Pref.shortToggle, true);
+  if (unset(Pref.reverseDays)) setBool(Pref.reverseDays, true);
+  if (unset(Pref.firstWeekday)) setString(Pref.firstWeekday, "2"); // Calendar numbering: 1 = Sunday, 2 = Monday
 }
