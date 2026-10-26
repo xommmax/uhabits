@@ -125,7 +125,7 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
           <AutoGrow placeholder="(Optional)" value={form.description} onInput={(description) => update({ description })} />
         </Field>
         <Field label="Category">
-          <input class="field-input" list="categories" value={form.category} onInput={(e) => update({ category: e.currentTarget.value })} />
+          <input class="field-input" list="categories" placeholder="(Optional)" value={form.category} onInput={(e) => update({ category: e.currentTarget.value })} />
           <datalist id="categories">
             {core.categories().map((c) => <option value={c} />)}
           </datalist>
