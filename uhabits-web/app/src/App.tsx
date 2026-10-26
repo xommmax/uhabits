@@ -49,7 +49,7 @@ export function App({ core }: { core: HabitsCore }) {
           onAdd={(numerical) => setRoute({ screen: "edit", id: null, numerical })}
           onEdit={(id) => setRoute({ screen: "edit", id, numerical: false })}
           onSettings={() => setRoute({ screen: "settings" })}
-          onAbout={() => setRoute({ screen: "about" })}
+          onAbout={() => setRoute({ screen: "about", from: "list" })}
         />
       );
       break;
@@ -88,11 +88,12 @@ export function App({ core }: { core: HabitsCore }) {
         refresh={refresh}
         toast={toast}
         onBack={() => setRoute({ screen: "list" })}
-        onAbout={() => setRoute({ screen: "about" })}
+        onAbout={() => setRoute({ screen: "about", from: "settings" })}
       />
     );
   } else if (route.screen === "about") {
-    screen = <AboutScreen onBack={() => setRoute({ screen: "settings" })} />;
+    const from = route.from;
+    screen = <AboutScreen onBack={() => setRoute({ screen: from })} />;
   }
 
   return (

@@ -56,4 +56,5 @@ export interface HabitForm {
 
 export type Route = { screen: "list" } | { screen: "habit"; id: number } | { screen: "edit"; id: number | null; numerical: boolean }
   | { screen: "settings" }
-  | { screen: "about" };
+  // About opens from the list menu or from Settings, and goes back there
+  | { screen: "about"; from: "list" | "settings" };
