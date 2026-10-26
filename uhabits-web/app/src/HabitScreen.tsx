@@ -1,7 +1,7 @@
 import { useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitDetail } from "./types";
-import { BarIcon, Chart, FA, Icon, Menu, Ring, TopBar, useDarkMode } from "./components";
+import { BarIcon, Chart, FA, Icon, Menu, Ring, Spinner, TopBar, useDarkMode } from "./components";
 import { shareCsv } from "./backup";
 import { EntryPopup, type PopupRequest } from "./popups";
 import { frequencyText, shortNumber } from "./format";
@@ -157,9 +157,7 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
         <section class="card">
           <div class="card-header">
             <h2 style={titleStyle}>Score</h2>
-            <select value={scoreBucket} onChange={(e) => setScoreBucket(Number(e.currentTarget.value))}>
-              {SCORE_BUCKETS.map((label, i) => <option value={i}>{label}</option>)}
-            </select>
+            <Spinner options={SCORE_BUCKETS} value={scoreBucket} onChange={setScoreBucket} />
           </div>
           <Chart height={SCORE_HEIGHT} deps={[id, rev, dark, scoreBucket]} create={(c) => core.scoreChart(c, id, dark, scoreBucket)} />
         </section>
@@ -167,9 +165,7 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
         <section class="card">
           <div class="card-header">
             <h2 style={titleStyle}>History</h2>
-            <select value={barBucket} onChange={(e) => setBarBucket(Number(e.currentTarget.value))}>
-              {(habit.numerical ? BAR_BUCKETS_NUMERICAL : BAR_BUCKETS_BOOLEAN).map((label, i) => <option value={i}>{label}</option>)}
-            </select>
+            <Spinner options={habit.numerical ? BAR_BUCKETS_NUMERICAL : BAR_BUCKETS_BOOLEAN} value={barBucket} onChange={setBarBucket} />
           </div>
           <Chart height={BAR_HEIGHT} deps={[id, rev, dark, barBucket]} create={(c) => core.barChart(c, id, dark, barBucket)} />
         </section>

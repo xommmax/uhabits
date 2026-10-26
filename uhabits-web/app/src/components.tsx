@@ -70,6 +70,35 @@ export interface MenuItem {
   submenu?: boolean;
 }
 
+const SPINNER_ITEM_HEIGHT = 48;
+
+/** Android's AppCompatSpinner: the current value with an arrow, opening a dropdown on top of itself. */
+export function Spinner(props: { options: string[]; value: number; onChange: (index: number) => void }) {
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const height = props.options.length * SPINNER_ITEM_HEIGHT + 12;
+  return (
+    <>
+      <button class="spinner" onClick={(e) => setAnchor(e.currentTarget.getBoundingClientRect())}>
+        {props.options[props.value]}
+        <MaterialIcon name="dropDown" />
+      </button>
+      {anchor && (
+        <div class="menu-overlay" onClick={() => setAnchor(null)}>
+          <div
+            class="menu spinner-dropdown"
+            style={{ top: `${Math.max(8, Math.min(anchor.top, window.innerHeight - height - 8))}px`, left: `${anchor.left}px` }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {props.options.map((label, i) => (
+              <button class="spinner-item" onClick={() => { setAnchor(null); props.onChange(i); }}>{label}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Android-style popup menu in the top-right corner, over the toolbar button that opened it. */
 export function Menu(props: { items: MenuItem[]; onClose: () => void }) {
   return (
