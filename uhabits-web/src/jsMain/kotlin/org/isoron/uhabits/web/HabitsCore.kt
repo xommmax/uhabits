@@ -181,6 +181,7 @@ class HabitsCore internal constructor(
         result.showArchived = preferences.showArchived
         result.showCompleted = preferences.showCompleted
         result.order = preferences.defaultPrimaryOrder.name
+        result.hasHabits = !habitList.isEmpty
         return result
     }
 

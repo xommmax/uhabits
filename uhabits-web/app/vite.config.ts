@@ -29,7 +29,7 @@ export default defineConfig({
         description: "Loop Habit Tracker, ported from Android",
         display: "standalone",
         background_color: "#f4f4f4",
-        theme_color: "#f4f4f4",
+        theme_color: "#303030",
         icons: [
           { src: "icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "icon-512.png", sizes: "512x512", type: "image/png" },

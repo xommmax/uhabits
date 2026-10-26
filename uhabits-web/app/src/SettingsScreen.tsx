@@ -1,7 +1,7 @@
 import { useState } from "preact/hooks";
 import type { ComponentChildren } from "preact";
 import type { HabitsCore } from "./core";
-import { TopBar } from "./components";
+import { BarIcon, TopBar } from "./components";
 import { daysSinceBackup, pickBackupFile, shareBackup, shareCsv } from "./backup";
 import { getBool, getString, Pref, setBool, setString } from "./prefs";
 import { applyTheme } from "./theme";
@@ -68,7 +68,7 @@ export function SettingsScreen({ core, refresh, toast, onBack, onAbout }: Props)
 
   return (
     <div class="screen">
-      <TopBar left={<button class="bar-button" onClick={onBack}>‹ Habits</button>} title="Settings" />
+      <TopBar left={<BarIcon name="back" label="Back" onClick={onBack} />} title="Settings" />
       <div class="form settings">
         <div class="form-label">Interface</div>
         <div class="form-group">

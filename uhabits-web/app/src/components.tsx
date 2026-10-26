@@ -31,46 +31,63 @@ export const FA = {
 
 export const Icon = ({ glyph }: { glyph: string }) => <span class="fa">{glyph}</span>;
 
+/** Material icons used by Android's toolbars (ic_action_add, ic_action_filter, overflow, back arrow). */
+const MATERIAL = {
+  add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
+  filter: "M10 18h4v-2h-4v2zM3 6v2h18V6H3zm3 7h12v-2H6v2z",
+  more: "M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
+  back: "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
+  edit: "M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 000-1.41l-2.34-2.34a1 1 0 00-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+} as const;
+
+export const MaterialIcon = ({ name }: { name: keyof typeof MATERIAL }) => (
+  <svg class="material-icon" width="24" height="24" viewBox="0 0 24 24"><path d={MATERIAL[name]} fill="currentColor" /></svg>
+);
+
+/** Toolbar button showing a material icon. */
+export const BarIcon = (props: { name: keyof typeof MATERIAL; label: string; onClick: () => void }) => (
+  <button class="bar-button" aria-label={props.label} onClick={props.onClick}><MaterialIcon name={props.name} /></button>
+);
+
+/** Android's toolbar: colorPrimary (or the habit's color), white title on the left. */
 export function TopBar(props: { left?: ComponentChildren; title?: ComponentChildren; right?: ComponentChildren; color?: string }) {
   return (
-    <header class={`topbar${props.color ? " colored" : ""}`} style={props.color ? { background: props.color } : undefined}>
-      <div class="topbar-side">{props.left}</div>
+    <header class={`topbar${props.left ? "" : " no-left"}`} style={props.color ? { background: props.color } : undefined}>
+      {props.left}
       <div class="topbar-title">{props.title}</div>
-      <div class="topbar-side right">{props.right}</div>
+      <div class="topbar-right">{props.right}</div>
     </header>
   );
 }
 
-export interface SheetItem {
+export interface MenuItem {
   label: string;
   onClick: () => void;
-  destructive?: boolean;
+  /** Shows a checkbox, like Android's checkable menu items. */
   checked?: boolean;
+  /** Shows an arrow, like Android's items that open a submenu. */
+  submenu?: boolean;
 }
 
-/** iOS-style action sheet. */
-export function Sheet(props: { items: SheetItem[]; footer?: string; onClose: () => void }) {
+/** Android-style popup menu in the top-right corner, over the toolbar button that opened it. */
+export function Menu(props: { items: MenuItem[]; footer?: string; onClose: () => void }) {
   return (
-    <div class="overlay" onClick={props.onClose}>
-      <div class="sheet" onClick={(e) => e.stopPropagation()}>
-        <div class="sheet-group">
-          {props.items.map((item) => (
-            <button
-              class={`sheet-item${item.destructive ? " destructive" : ""}`}
-              onClick={() => {
-                props.onClose();
-                item.onClick();
-              }}
-            >
-              {item.label}
-              {item.checked && <span class="sheet-check">✓</span>}
-            </button>
-          ))}
-          {props.footer && <div class="sheet-footer">{props.footer}</div>}
-        </div>
-        <div class="sheet-group">
-          <button class="sheet-item bold" onClick={props.onClose}>Cancel</button>
-        </div>
+    <div class="menu-overlay" onClick={props.onClose}>
+      <div class="menu" onClick={(e) => e.stopPropagation()}>
+        {props.items.map((item) => (
+          <button
+            class="menu-item"
+            onClick={() => {
+              props.onClose();
+              item.onClick();
+            }}
+          >
+            {item.label}
+            {item.checked !== undefined && <span class={`checkbox${item.checked ? " on" : ""}`} />}
+            {item.submenu && <span class="menu-arrow" />}
+          </button>
+        ))}
+        {props.footer && <div class="menu-footer">{props.footer}</div>}
       </div>
     </div>
   );

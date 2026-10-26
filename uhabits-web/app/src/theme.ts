@@ -24,6 +24,8 @@ export function applyTheme() {
   if (user === THEME_AUTOMATIC) delete root.dataset.theme;
   else root.dataset.theme = user === THEME_DARK ? "dark" : "light";
   root.classList.toggle("pure-black", getString("pref_pure_black", "false") === "true");
+  // Status bar on Android: colorPrimaryDark of the light and dark themes
+  document.querySelector('meta[name="theme-color"]')?.setAttribute("content", isNightMode() ? "#000000" : "#303030");
   listeners.forEach((l) => l());
 }
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitRow } from "./types";
-import { FA, Icon, Ring, Sheet, type SheetItem, TopBar, useDarkMode } from "./components";
+import { BarIcon, FA, Icon, Menu, type MenuItem, Ring, TopBar, useDarkMode } from "./components";
 import { daysSinceBackup, shareBackup, shouldRemind, snoozeReminder } from "./backup";
 import { Entry, formatDay, PALETTE, shortNumber } from "./format";
 import { celebrate, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
@@ -19,8 +19,8 @@ const HINTS = [
   "You can see more days by putting your phone in landscape mode.",
 ];
 
-// FontAwesome glyphs used by Android's toolbar and selection menu
-const ICON = { search: "", edit: "", color: "", archive: "", unarchive: "", delete: "" };
+// FontAwesome glyphs used by Android's selection menu and empty list (EmptyListView)
+const ICON = { starHalf: "", umbrellaBeach: "", edit: "", color: "", archive: "", unarchive: "", delete: "" };
 
 function useDayColumns(): number {
   const compute = () => Math.max(3, Math.min(14, Math.floor((window.innerWidth - NAME_MIN_WIDTH - 24) / COLUMN_WIDTH)));
@@ -85,7 +85,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   void rev;
 
   const habits = core.listHabits(query ?? "", columns) as HabitRow[];
-  const options = core.listOptions() as { showArchived: boolean; showCompleted: boolean; order: string };
+  const options = core.listOptions() as { showArchived: boolean; showCompleted: boolean; order: string; hasHabits: boolean };
   const manualOrder = options.order === "BY_POSITION";
   const today = core.today();
   const reversed = getBool(Pref.reverseDays);
@@ -168,7 +168,6 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
     core.sortBy(by);
     refresh();
   };
-  const orderIs = (...orders: string[]) => orders.includes(options.order);
 
   // --- Top bar: normal, search, or selection mode ---
   let topBar;
@@ -177,7 +176,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
     const canUnarchive = selectedHabits.every((h) => h.archived);
     topBar = (
       <TopBar
-        left={<button class="bar-button" onClick={clearSelection}>Cancel</button>}
+        left={<BarIcon name="back" label="Cancel" onClick={clearSelection} />}
         title={`${selected.size} selected`}
         right={
           <>
@@ -202,18 +201,18 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
           value={query}
           onInput={(e) => setQuery(e.currentTarget.value)}
         />
-        <button class="bar-button" onClick={() => setQuery(null)}>Cancel</button>
+        <button class="bar-button text" onClick={() => setQuery(null)}>Cancel</button>
       </header>
     );
   } else {
     topBar = (
       <TopBar
-        title={<span class="large-title">Habits</span>}
+        title="Habits"
         right={
           <>
-            <button class="bar-button fa-button" aria-label="Search" onClick={() => setQuery("")}><Icon glyph={ICON.search} /></button>
-            <button class="bar-button icon" aria-label="Add habit" onClick={() => setDialog({ kind: "type" })}>＋</button>
-            <button class="bar-button icon" aria-label="Menu" onClick={() => setDialog({ kind: "menu" })}>⋯</button>
+            <BarIcon name="add" label="Add habit" onClick={() => setDialog({ kind: "type" })} />
+            <BarIcon name="filter" label="Filter" onClick={() => setDialog({ kind: "filter" })} />
+            <BarIcon name="more" label="More options" onClick={() => setDialog({ kind: "menu" })} />
           </>
         }
       />
@@ -259,9 +258,8 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
     );
   });
 
-  const menuItems: SheetItem[] = [
-    { label: "Filter", onClick: () => setDialog({ kind: "filter" }) },
-    { label: "Sort", onClick: () => setDialog({ kind: "sort" }) },
+  // Android's res/menu/list_habits.xml
+  const menuItems: MenuItem[] = [
     { label: "Dark theme", checked: isNightMode(), onClick: toggleNightMode },
     { label: "Settings", onClick: onSettings },
     { label: "Help & FAQ", onClick: () => window.open(HELP_URL, "_blank") },
@@ -289,47 +287,49 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
         </button>
       )}
 
-      {habits.length === 0 ? (
-        <div class="empty">
-          <p>{query ? "No habits found." : "You have no active habits"}</p>
-          {!query && <button class="primary-button" onClick={() => setDialog({ kind: "type" })}>Add a habit</button>}
+      <div class="habit-list">
+        <div class="list-header">
+          <div class="list-header-spacer" />
+          {dayIndexes.map((i) => (
+            <div class="day-label">
+              <span>{formatDay(today - i, { weekday: "short" }).toUpperCase()}</span>
+              <span>{formatDay(today - i, { day: "numeric" })}</span>
+            </div>
+          ))}
         </div>
-      ) : (
-        <div class="habit-list">
-          <div class="list-header">
-            <div class="list-header-spacer" />
-            {dayIndexes.map((i) => (
-              <div class="day-label">
-                <span>{formatDay(today - i, { weekday: "short" }).toUpperCase()}</span>
-                <span>{formatDay(today - i, { day: "numeric" })}</span>
-              </div>
-            ))}
-          </div>
-          {rows}
+        {rows}
+      </div>
+
+      {habits.length === 0 && (
+        <div class="empty">
+          <span class="fa empty-icon">{options.hasHabits && !query ? ICON.umbrellaBeach : ICON.starHalf}</span>
+          <p>{query ? "No habits found." : options.hasHabits ? "You're all done for today!" : "You have no active habits"}</p>
         </div>
       )}
 
       {popup && <EntryPopup core={core} request={popup} onClose={(changed) => { setPopup(null); if (changed) refresh(); }} />}
       {dialog?.kind === "type" && <HabitTypePicker onClose={() => setDialog(null)} onPick={(numerical) => { setDialog(null); onAdd(numerical); }} />}
-      {dialog?.kind === "menu" && <Sheet onClose={() => setDialog(null)} footer={`${lastBackupText()}\n${versionText()}`} items={menuItems} />}
+      {dialog?.kind === "menu" && <Menu onClose={() => setDialog(null)} footer={`${lastBackupText()}\n${versionText()}`} items={menuItems} />}
       {dialog?.kind === "filter" && (
-        <Sheet
+        <Menu
           onClose={() => setDialog(null)}
           items={[
             { label: "Hide archived", checked: !options.showArchived, onClick: () => { core.setShowArchived(!options.showArchived); refresh(); } },
             { label: "Hide completed", checked: !options.showCompleted, onClick: () => { core.setShowCompleted(!options.showCompleted); refresh(); } },
+            { label: "Sort", submenu: true, onClick: () => setDialog({ kind: "sort" }) },
+            { label: "Search", onClick: () => setQuery("") },
           ]}
         />
       )}
       {dialog?.kind === "sort" && (
-        <Sheet
+        <Menu
           onClose={() => setDialog(null)}
           items={[
-            { label: "Manually", checked: manualOrder, onClick: () => pickSort("manual") },
-            { label: "By name", checked: orderIs("BY_NAME_ASC", "BY_NAME_DESC"), onClick: () => pickSort("name") },
-            { label: "By color", checked: orderIs("BY_COLOR_ASC", "BY_COLOR_DESC"), onClick: () => pickSort("color") },
-            { label: "By score", checked: orderIs("BY_SCORE_ASC", "BY_SCORE_DESC"), onClick: () => pickSort("score") },
-            { label: "By status", checked: orderIs("BY_STATUS_ASC", "BY_STATUS_DESC"), onClick: () => pickSort("status") },
+            { label: "Manually", onClick: () => pickSort("manual") },
+            { label: "By name", onClick: () => pickSort("name") },
+            { label: "By color", onClick: () => pickSort("color") },
+            { label: "By score", onClick: () => pickSort("score") },
+            { label: "By status", onClick: () => pickSort("status") },
           ]}
         />
       )}

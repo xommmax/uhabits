@@ -102,9 +102,9 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
     <div class="screen">
       <TopBar
         color={PALETTE[form.colorIndex]}
-        left={<button class="bar-button" onClick={onDone}>Cancel</button>}
+        left={<button class="bar-button text" onClick={onDone}>Cancel</button>}
         title={id === null ? "Create habit" : "Edit habit"}
-        right={<button class="bar-button bold" disabled={!valid} onClick={save}>Save</button>}
+        right={<button class="bar-button text bold" disabled={!valid} onClick={save}>Save</button>}
       />
       <div class="form">
         <div class="form-group">

@@ -1,7 +1,7 @@
 import { useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitDetail } from "./types";
-import { Chart, FA, Icon, Ring, Sheet, TopBar, useDarkMode } from "./components";
+import { BarIcon, Chart, FA, Icon, Menu, Ring, TopBar, useDarkMode } from "./components";
 import { shareCsv } from "./backup";
 import { EntryPopup, type PopupRequest } from "./popups";
 import { frequencyText, shortNumber } from "./format";
@@ -91,12 +91,12 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
     >
       <TopBar
         color={habit.colorLight}
-        left={<button class="bar-button" onClick={onBack}>‹ Habits</button>}
+        left={<BarIcon name="back" label="Back" onClick={onBack} />}
         title={habit.name}
         right={
           <>
-            <button class="bar-button" onClick={onEdit}>Edit</button>
-            <button class="bar-button icon" aria-label="Menu" onClick={() => setMenuOpen(true)}>⋯</button>
+            <BarIcon name="edit" label="Edit" onClick={onEdit} />
+            <BarIcon name="more" label="More options" onClick={() => setMenuOpen(true)} />
           </>
         }
       />
@@ -211,14 +211,14 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
       {popup && <EntryPopup core={core} request={popup} onClose={(changed) => { setPopup(null); if (changed) refresh(); }} />}
 
       {menuOpen && (
-        <Sheet
+        <Menu
           onClose={() => setMenuOpen(false)}
           items={[
             { label: "Export", onClick: exportCsv },
             habit.archived
               ? { label: "Unarchive", onClick: () => { core.unarchive([id]); refresh(); } }
               : { label: "Archive", onClick: () => { core.archive([id]); onBack(); } },
-            { label: "Delete", destructive: true, onClick: remove },
+            { label: "Delete", onClick: remove },
           ]}
         />
       )}

@@ -1,4 +1,4 @@
-import { TopBar } from "./components";
+import { BarIcon, TopBar } from "./components";
 
 // Android's AboutActivity (res/layout/about.xml and res/values/constants.xml)
 const LINKS = [
@@ -20,7 +20,7 @@ export function AboutScreen({ onBack }: { onBack: () => void }) {
   const built = new Date(time).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
   return (
     <div class="screen">
-      <TopBar left={<button class="bar-button" onClick={onBack}>‹ Settings</button>} title="About" />
+      <TopBar left={<BarIcon name="back" label="Back" onClick={onBack} />} title="About" />
       <div class="form about">
         <div class="about-header">
           <img src="icon-192.png" alt="" width={72} height={72} />

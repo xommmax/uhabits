@@ -23,8 +23,8 @@
   --separator: #e6e6e6;
   --accent: #007aff;
   --destructive: #ff3b30;
-  --bar-bg: rgba(244, 244, 244, 0.92);
-  --sheet: rgba(249, 249, 249, 0.96);
+  --toolbar: #363636;
+  --menu: #ffffff;
   color-scheme: light dark;
 }
 /* Dark theme: follows the system unless chosen in the app (theme.ts sets data-theme). */
@@ -39,8 +39,8 @@
     --separator: #3d3d3d;
     --accent: #0a84ff;
     --destructive: #ff453a;
-    --bar-bg: rgba(18, 18, 18, 0.92);
-    --sheet: rgba(44, 44, 46, 0.96);
+    --toolbar: #101010;
+    --menu: #424242;
   }
 }
 :root[data-theme="dark"] {
@@ -53,13 +53,13 @@
   --separator: #3d3d3d;
   --accent: #0a84ff;
   --destructive: #ff453a;
-  --bar-bg: rgba(18, 18, 18, 0.92);
-  --sheet: rgba(44, 44, 46, 0.96);
+  --toolbar: #101010;
+  --menu: #424242;
 }
 /* Android's "pure black" option */
-:root.pure-black[data-theme="dark"] { --bg: #000000; --card: #000000; }
+:root.pure-black[data-theme="dark"] { --bg: #000000; --card: #000000; --toolbar: #000000; }
 @media (prefers-color-scheme: dark) {
-  :root.pure-black:not([data-theme="light"]) { --bg: #000000; --card: #000000; }
+  :root.pure-black:not([data-theme="light"]) { --bg: #000000; --card: #000000; --toolbar: #000000; }
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -75,25 +75,21 @@ button:disabled { opacity: 0.35; cursor: default; }
 
 .screen { min-height: 100vh; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
 
-/* Top bar */
+/* Top bar (Android's Toolbar: colorPrimary, white title on the left) */
 .topbar {
   position: sticky; top: 0; z-index: 10;
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
-  min-height: 44px;
-  padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
-  background: var(--bar-bg);
-  -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px);
-  border-bottom: 0.5px solid var(--separator);
+  display: flex; align-items: center; gap: 4px;
+  min-height: 52px;
+  padding: env(safe-area-inset-top) max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
+  background: var(--toolbar); color: #fff;
 }
-.topbar.colored { color: #fff; border-bottom: 0; }
-.topbar.colored .bar-button { color: #fff; }
-.topbar-title { font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 55vw; }
-.topbar-side { display: flex; gap: 4px; align-items: center; }
-.topbar-side.right { justify-content: flex-end; }
-.large-title { font-size: 20px; font-weight: 700; }
-.bar-button { color: var(--accent); padding: 10px 8px; min-height: 44px; }
-.bar-button.icon { font-size: 24px; line-height: 1; min-width: 40px; }
+.topbar.no-left { padding-left: max(16px, env(safe-area-inset-left)); }
+.topbar-title { flex: 1; min-width: 0; font-size: 20px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar-right { display: flex; align-items: center; flex: none; }
+.bar-button { color: #fff; min-width: 48px; min-height: 48px; display: flex; align-items: center; justify-content: center; }
+.bar-button.text { padding: 0 12px; }
 .bar-button.bold { font-weight: 600; }
+.material-icon { display: block; }
 
 /* Backup reminder */
 .banner { margin: 12px; padding: 14px 16px; background: var(--card); border-radius: 12px; }
@@ -140,8 +136,13 @@ button:disabled { opacity: 0.35; cursor: default; }
 .habit-row.reorder.dragging { transition: none; z-index: 5; position: relative; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.2); }
 .drag-handle { padding: 0 18px; font-size: 24px; color: var(--muted); touch-action: none; align-self: stretch; display: flex; align-items: center; }
 
-.empty { text-align: center; padding: 80px 24px; color: var(--muted); }
-.primary-button { background: var(--accent); color: #fff; padding: 12px 22px; border-radius: 12px; font-weight: 600; }
+/* Android's EmptyListView, centered in the space below the header */
+.empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: calc(100vh - 130px - env(safe-area-inset-top)); padding: 0 24px; color: var(--muted); font-size: 15px; text-align: center;
+}
+.empty-icon { font-size: 92px; line-height: 1; margin: 0; }
+.empty p { margin: 20px 0 0; }
 
 /* Habit detail */
 .cards { padding: 8px max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left)); }
@@ -185,16 +186,33 @@ button:disabled { opacity: 0.35; cursor: default; }
 .swatch { aspect-ratio: 1; border-radius: 50%; }
 .swatch.selected { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--text); }
 
-/* Action sheet */
+/* Dialog overlay, and the full-width buttons of the calendar editor */
 .overlay { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.35); display: flex; align-items: flex-end; }
-.sheet { width: 100%; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); }
-.sheet-group { background: var(--sheet); border-radius: 14px; overflow: hidden; margin-top: 8px; -webkit-backdrop-filter: blur(20px); backdrop-filter: blur(20px); }
 .sheet-item { display: flex; justify-content: center; position: relative; width: 100%; padding: 17px; font-size: 19px; color: var(--accent); border-bottom: 0.5px solid var(--separator); }
 .sheet-item:last-child { border-bottom: 0; }
-.sheet-item.destructive { color: var(--destructive); }
 .sheet-item.bold { font-weight: 600; }
-.sheet-check { position: absolute; right: 20px; }
-.sheet-footer { text-align: center; font-size: 13px; color: var(--muted); padding: 12px; white-space: pre-line; }
+
+/* Popup menu (Android's PopupMenu) */
+.menu-overlay { position: fixed; inset: 0; z-index: 20; }
+.menu {
+  position: absolute; top: calc(env(safe-area-inset-top) + 4px); right: max(4px, env(safe-area-inset-right));
+  min-width: 190px; max-width: calc(100vw - 8px); padding: 6px 0;
+  background: var(--menu); color: var(--text); border-radius: 6px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+  transform-origin: top right; animation: menu-in 0.12s ease-out;
+}
+@keyframes menu-in { from { opacity: 0; transform: scale(0.9); } }
+.menu-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 32px;
+  width: 100%; min-height: 46px; padding: 0 16px; font-size: 16px; text-align: left;
+}
+.menu-item:active { background: rgba(128, 128, 128, 0.18); }
+.checkbox { flex: none; width: 18px; height: 18px; border: 2px solid var(--muted); border-radius: 2px; }
+.checkbox.on {
+  border-color: #1976d2;
+  background: #1976d2 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z' fill='white'/%3E%3C/svg%3E") center / 16px no-repeat;
+}
+.menu-arrow { flex: none; width: 0; height: 0; border-style: solid; border-width: 5px 0 5px 6px; border-color: transparent transparent transparent currentColor; opacity: 0.6; }
+.menu-footer { margin-top: 6px; padding: 8px 16px 4px; border-top: 1px solid var(--separator); font-size: 12px; color: var(--muted); white-space: pre-line; }
 
 .toast {
   position: fixed; left: 50%; bottom: calc(32px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30;
@@ -226,12 +244,13 @@ button:disabled { opacity: 0.35; cursor: default; }
 .form-row input.wide { width: 50%; text-align: right; color: var(--text); }
 
 /* Main list: search, selection, categories, hints (Phase 3) */
-.fa-button { font-size: 18px; padding: 10px 7px; }
-.search-bar { display: flex; gap: 8px; align-items: center; grid-template-columns: none; }
+.fa-button { font-size: 18px; min-width: 40px; }
+.search-bar { padding-left: max(12px, env(safe-area-inset-left)); }
 .search-input {
-  flex: 1; min-width: 0; font: inherit; border: 0; border-radius: 10px; padding: 8px 12px;
-  background: var(--faint); color: var(--text); outline: none; -webkit-appearance: none;
+  flex: 1; min-width: 0; font: inherit; border: 0; border-radius: 6px; padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.15); color: #fff; outline: none; -webkit-appearance: none;
 }
+.search-input::placeholder { color: rgba(255, 255, 255, 0.6); }
 .category-header {
   display: block; width: 100%; text-align: left; padding: 14px 12px 6px; font-size: 14px; font-weight: 600; color: var(--muted);
 }
