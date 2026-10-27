@@ -272,6 +272,8 @@ button:disabled { opacity: 0.35; cursor: default; }
 /* Main list: selection, categories, hints (Phase 3) */
 .category-header {
   display: block; width: 100%; text-align: left; padding: 14px 12px 6px; font-size: 14px; font-weight: 600; color: var(--muted);
+  /* Long-pressed to rename: no text selection or callout menu */
+  -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
 }
 .habit-row.selected { background: color-mix(in srgb, var(--accent) 14%, var(--card)); }
 .habit-row.shifting { transition: transform 0.15s; }

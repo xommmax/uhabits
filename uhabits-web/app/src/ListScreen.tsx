@@ -23,6 +23,15 @@ const HINTS = [
 // FontAwesome glyphs of Android's empty list (EmptyListView)
 const ICON = { starHalf: "", umbrellaBeach: "" };
 
+/** A category's header; a long press (not a tap, which is easy to make by accident) renames it. */
+function CategoryHeader(props: { category: string; onRename: () => void }) {
+  const press = usePress(() => {}, () => {
+    haptic("toggle");
+    props.onRename();
+  });
+  return <button class="category-header" {...press}>{props.category}</button>;
+}
+
 function useDayColumns(): number {
   // Same rule as ListHabitsRootView.getCheckmarkCount
   const compute = () => {
@@ -209,7 +218,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   habits.forEach((h, i) => {
     const category = h.category.trim();
     if (category && category !== lastCategory) {
-      rows.push(<button key={`c:${category}`} class="category-header" onClick={() => renameCategory(category)}>{category}</button>);
+      rows.push(<CategoryHeader key={`c:${category}`} category={category} onRename={() => renameCategory(category)} />);
       lastCategory = category;
     }
     const isDragged = drag?.id === h.id;
