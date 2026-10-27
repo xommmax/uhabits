@@ -225,8 +225,10 @@ export function Chart(props: {
     const d = drag.current;
     const handle = handleRef.current;
     if (!d.active || !handle || handle.columnWidth <= 0) return;
-    d.samples.push({ t: e.timeStamp, x: e.clientX });
-    if (d.samples.length > 20) d.samples.shift();
+    // Every touch sample since the last event, like the history Android's VelocityTracker gets
+    const events = e.getCoalescedEvents?.() ?? [];
+    for (const c of events.length ? events : [e]) d.samples.push({ t: c.timeStamp, x: c.clientX });
+    if (d.samples.length > 40) d.samples.splice(0, d.samples.length - 40);
     const dx = e.clientX - d.startX;
     if (Math.abs(dx) > TAP_SLOP_PX) {
       d.moved = true;

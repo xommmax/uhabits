@@ -83,6 +83,9 @@ function createParticle(burst: Burst): Particle {
 
 /** One physics step of [dt] seconds (PartyEmitter.createConfetti + Confetti.render). */
 function step(burst: Burst, dt: number, height: number) {
+  // Konfetti keeps a particle's width in physical pixels and shrinks it for the 3D flip by a fixed number of
+  // physical pixels, so in dp the flip is slower by the screen density (2.6 to 3 on phones)
+  const density = window.devicePixelRatio || 1;
   // Emitter(duration = 25 ms).max(25): one particle per ms while the 25 ms last
   burst.pending += dt;
   if (burst.pending >= 0.001 && burst.elapsedMs < 25) {
@@ -101,7 +104,7 @@ function step(burst: Burst, dt: number, height: number) {
     p.alpha = Math.max(0, p.alpha - Math.trunc(5 * dt * SPEED_F)); // timeToLive 0: fades from the start
     p.rotation += p.rotationSpeed2D * dt * SPEED_F;
     if (p.rotation >= 360) p.rotation = 0;
-    p.rotationWidth -= Math.abs(p.rotationSpeed3D) * dt * SPEED_F;
+    p.rotationWidth -= (Math.abs(p.rotationSpeed3D) * dt * SPEED_F) / density;
     if (p.rotationWidth < 0) p.rotationWidth = p.width;
     p.scaleX = Math.abs(p.rotationWidth / p.width - 0.5) * 2;
   }

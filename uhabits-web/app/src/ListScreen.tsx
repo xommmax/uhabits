@@ -5,6 +5,7 @@ import { BarIcon, Menu, type MenuItem, Ring, TopBar, useDarkMode } from "./compo
 import { shareBackup, shouldRemind, snoozeReminder } from "./backup";
 import { Entry, formatDay, shortNumber } from "./format";
 import { celebrate, ColorPicker, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
+import { haptic } from "./haptics";
 import { getBool, Pref } from "./prefs";
 import { isNightMode, toggleNightMode } from "./theme";
 
@@ -426,9 +427,18 @@ function CheckButton(props: {
     fn(r.left + r.width / 2, r.top + r.height / 2);
   };
   const shortToggle = getBool(Pref.shortToggle);
+  // Like Android: a tick on every toggle (CheckmarkButton.performToggle) and on every long press (View.performLongClick)
+  const toggle = (x: number, y: number) => {
+    haptic("toggle");
+    props.onToggle(x, y);
+  };
+  const longPressed = (fn: (x: number, y: number) => void) => (x: number, y: number) => {
+    if (fn !== toggle) haptic("toggle");
+    fn(x, y);
+  };
   const press = habit.numerical
-    ? usePress(at(props.onPopup), at(props.onPopup))
-    : usePress(at(shortToggle ? props.onToggle : props.onPopup), at(shortToggle ? props.onPopup : props.onToggle));
+    ? usePress(at(props.onPopup), at(longPressed(props.onPopup)))
+    : usePress(at(shortToggle ? toggle : props.onPopup), at(longPressed(shortToggle ? props.onPopup : toggle)));
   const hasNotes = habit.notes[props.index].trim() !== "";
   return (
     <button ref={ref} class="check" {...press}>

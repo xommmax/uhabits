@@ -62,24 +62,39 @@ export function fling(velocity: number): Fling {
 }
 
 /**
- * Release velocity in px per second from recent pointer samples, like Android's VelocityTracker: a least-squares
- * fit over the last 100 ms, and 0 if the finger stopped for 40 ms before lifting.
+ * Release velocity in px per second from recent pointer samples, like Android's default VelocityTracker strategy
+ * (LSQ2): positions over the last 100 ms (at most 20 samples) fitted with a quadratic in time, and the velocity
+ * at the newest sample is its slope there; 0 if the finger stopped for 40 ms before lifting. A straight-line fit
+ * would give the average speed instead, which in a flick is well below the speed at the moment of lifting.
  */
 export function releaseVelocity(samples: { t: number; x: number }[], upTime: number): number {
   if (samples.length < 2) return 0;
   const last = samples[samples.length - 1];
   if (upTime - last.t > 40) return 0;
-  const recent = samples.filter((s) => last.t - s.t <= 100);
+  const recent = samples.filter((s) => last.t - s.t <= 100).slice(-20);
+  // Time in seconds relative to the newest sample; with only two samples, the fit is a straight line
+  const degree = recent.length >= 3 ? 2 : 1;
   if (recent.length < 2) return 0;
-  const n = recent.length;
-  const meanT = recent.reduce((s, p) => s + p.t, 0) / n;
-  const meanX = recent.reduce((s, p) => s + p.x, 0) / n;
-  let num = 0, den = 0;
-  for (const p of recent) {
-    num += (p.t - meanT) * (p.x - meanX);
-    den += (p.t - meanT) ** 2;
+  const size = degree + 1;
+  const sums = new Array(2 * degree + 1).fill(0), rhs = new Array(size).fill(0);
+  for (const s of recent) {
+    const t = (s.t - last.t) / 1000;
+    for (let k = 0; k < sums.length; k++) sums[k] += t ** k;
+    for (let k = 0; k < size; k++) rhs[k] += s.x * t ** k;
   }
-  if (den === 0) return 0;
-  const v = (num / den) * 1000;
+  // Normal equations, solved by Gaussian elimination: coefficient 1 is the velocity
+  const m = Array.from({ length: size }, (_, i) => [...sums.slice(i, i + size), rhs[i]]);
+  for (let col = 0; col < size; col++) {
+    let pivot = col;
+    for (let r = col + 1; r < size; r++) if (Math.abs(m[r][col]) > Math.abs(m[pivot][col])) pivot = r;
+    if (Math.abs(m[pivot][col]) < 1e-12) return 0;
+    [m[col], m[pivot]] = [m[pivot], m[col]];
+    for (let r = 0; r < size; r++) {
+      if (r === col) continue;
+      const f = m[r][col] / m[col][col];
+      for (let c = col; c <= size; c++) m[r][c] -= f * m[col][c];
+    }
+  }
+  const v = m[1][size] / m[1][1];
   return Math.max(-MAX_FLING_VELOCITY, Math.min(MAX_FLING_VELOCITY, v));
 }

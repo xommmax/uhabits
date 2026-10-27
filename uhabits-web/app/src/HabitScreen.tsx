@@ -1,4 +1,5 @@
 import { useRef, useState } from "preact/hooks";
+import { haptic } from "./haptics";
 import type { HabitsCore } from "./core";
 import type { HabitDetail } from "./types";
 import { BarIcon, Chart, FA, Icon, Menu, Ring, Spinner, TopBar, useDarkMode } from "./components";
@@ -61,8 +62,15 @@ export function HabitScreen({ core, id, rev, refresh, toast, onBack, onEdit }: P
     });
   const calendar = (canvas: HTMLCanvasElement, padding: number) => {
     const chart = core.historyChart(canvas, id, dark, padding);
-    chart.setOnEdited(refresh);
-    chart.setOnPopup(showPopup);
+    // HistoryCardPresenter.showFeedback on every press of a day
+    chart.setOnEdited(() => {
+      haptic("key");
+      refresh();
+    });
+    chart.setOnPopup((day) => {
+      haptic("key");
+      showPopup(day);
+    });
     return chart;
   };
 
