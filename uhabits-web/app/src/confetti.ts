@@ -1,7 +1,9 @@
 // Port of the Konfetti 2.0.2 burst Android shows when a habit is checked
 // (ListHabitsScreen.showConfetti + konfetti-core's PartyEmitter, Confetti and KonfettiView).
 // Konfetti's physics run once per frame, so the burst depends on the refresh rate; it is stepped at a fixed
-// 120 Hz here to look like Android on a 120 Hz phone whatever the iPhone's refresh rate. Sizes are in dp = CSS px.
+// 120 Hz here to look like Android on a 120 Hz phone whatever the iPhone's refresh rate. Each frame is drawn
+// between the last two steps, as far as the frame's time has got: frame times wobble, and drawing only whole
+// steps would sometimes freeze a frame and then jump two steps, which looks like flickering. Sizes are in dp = CSS px.
 
 const STEP = 1 / 120;
 const SPEED_F = 60;
@@ -26,6 +28,8 @@ interface Particle {
   alpha: number;
   rotation: number; rotationWidth: number; scaleX: number;
   rotationSpeed2D: number; rotationSpeed3D: number;
+  // State before the last step, to draw in between
+  prevX: number; prevY: number; prevAlpha: number; prevRotation: number; prevScaleX: number;
 }
 
 interface Burst {
@@ -73,6 +77,7 @@ function createParticle(burst: Burst): Particle {
     alpha: 255,
     rotation: 0, rotationWidth: size.dp, scaleX: 0,
     rotationSpeed2D: rotationSpeed() * 8, rotationSpeed3D: rotationSpeed() * 1.5,
+    prevX: 0, prevY: 0, prevAlpha: 255, prevRotation: 0, prevScaleX: 0,
   };
 }
 
@@ -87,6 +92,7 @@ function step(burst: Burst, dt: number, height: number) {
   }
   burst.elapsedMs += dt * 1000;
   for (const p of burst.particles) {
+    p.prevX = p.x; p.prevY = p.y; p.prevAlpha = p.alpha; p.prevRotation = p.rotation; p.prevScaleX = p.scaleX;
     if (burst.y + p.y > height) { p.alpha = 0; continue; }
     p.ay += GRAVITY / p.mass; // Konfetti never resets the acceleration
     p.vx += p.ax; p.vy += p.ay;
@@ -102,20 +108,25 @@ function step(burst: Burst, dt: number, height: number) {
   burst.particles = burst.particles.filter((p) => p.alpha > 0);
 }
 
-/** KonfettiView.display, with the origin at (BOX.side, BOX.up) of the burst's canvas. */
-function draw(burst: Burst) {
+/** KonfettiView.display, with the origin at (BOX.side, BOX.up) of the burst's canvas; [t] in 0..1 is how far
+ *  the frame is between the previous step and the last one. */
+function draw(burst: Burst, t: number) {
   const { ctx, ratio } = burst;
+  const mix = (a: number, b: number) => a + (b - a) * t;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, burst.canvas.width, burst.canvas.height);
   for (const p of burst.particles) {
-    const centerX = (p.scaleX * p.width) / 2;
+    const x = mix(p.prevX, p.x), y = mix(p.prevY, p.y), scaleX = mix(p.prevScaleX, p.scaleX);
+    // rotation wraps from 359 back to 0
+    const rotation = mix(p.prevRotation, p.rotation < p.prevRotation ? p.rotation + 360 : p.rotation);
+    const centerX = (scaleX * p.width) / 2;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    ctx.translate(BOX.side + p.x - centerX, BOX.up + p.y);
+    ctx.translate(BOX.side + x - centerX, BOX.up + y);
     ctx.translate(centerX, p.width / 2);
-    ctx.rotate((p.rotation * Math.PI) / 180);
+    ctx.rotate((rotation * Math.PI) / 180);
     ctx.translate(-centerX, -p.width / 2);
-    ctx.scale(p.scaleX, 1);
-    ctx.globalAlpha = p.alpha / 255;
+    ctx.scale(scaleX, 1);
+    ctx.globalAlpha = mix(p.prevAlpha, p.alpha) / 255;
     ctx.fillStyle = p.color;
     if (p.circle) {
       ctx.beginPath();
@@ -136,7 +147,7 @@ function frame(time: number) {
     accumulator -= STEP;
   }
   for (const burst of bursts) {
-    if (burst.particles.length || burst.elapsedMs < 25) draw(burst);
+    if (burst.particles.length || burst.elapsedMs < 25) draw(burst, accumulator / STEP);
     else burst.canvas.remove();
   }
   bursts = bursts.filter((b) => b.canvas.isConnected);

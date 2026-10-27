@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { ChartHandle } from "habits-core";
+import { fling, MIN_FLING_VELOCITY, releaseVelocity } from "./fling";
 
 export { useDarkMode } from "./theme";
 
@@ -142,8 +143,8 @@ const TAP_SLOP_PX = 8;
 const LONG_PRESS_MS = 500;
 
 /**
- * Canvas showing a core chart. Drag sideways to scroll back in time, tap to
- * click (e.g. toggle a day in the calendar) unless [readOnly]. With
+ * Canvas showing a core chart. Drag sideways to scroll back in time (a fast swipe keeps coasting, as on Android),
+ * tap to click (e.g. toggle a day in the calendar) unless [readOnly]. With
  * [keepScroll], the chart stays scrolled where it was when its data changes.
  */
 export function Chart(props: {
@@ -155,7 +156,8 @@ export function Chart(props: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const handleRef = useRef<ChartHandle | null>(null);
-  const drag = useRef({ startX: 0, columns: 0, moved: false, active: false, longPressed: false });
+  const drag = useRef({ startX: 0, columns: 0, moved: false, active: false, longPressed: false, stoppedFling: false, samples: [] as { t: number; x: number }[] });
+  const flingFrame = useRef<number>();
   const longPressTimer = useRef<ReturnType<typeof setTimeout>>();
   // Columns scrolled back in time, mirroring the view's dataOffset (never below 0)
   const scrolled = useRef(0);
@@ -169,16 +171,50 @@ export function Chart(props: {
     else scrolled.current = 0;
     const observer = new ResizeObserver(() => handle.draw());
     observer.observe(canvas);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      stopFling();
+    };
   }, props.deps);
 
+  /** Scrolls by [columns] (positive = back in time); false once it can't go further. */
+  const scroll = (columns: number) => {
+    if (!handleRef.current?.scrollBy(columns)) return false;
+    scrolled.current = Math.max(0, scrolled.current + columns);
+    return true;
+  };
+  const stopFling = () => {
+    if (flingFrame.current === undefined) return false;
+    cancelAnimationFrame(flingFrame.current);
+    flingFrame.current = undefined;
+    return true;
+  };
+  /** ScrollableChart.onFling: coasts with half the release velocity, in whole columns, from [offset] px past the last one. */
+  const startFling = (velocity: number, offset: number) => {
+    const width = handleRef.current?.columnWidth ?? 0;
+    if (width <= 0 || Math.abs(velocity) < MIN_FLING_VELOCITY) return;
+    const f = fling(velocity / 2);
+    let applied = 0, start = -1;
+    const frame = (time: number) => {
+      if (start < 0) start = time;
+      const elapsed = time - start;
+      const columns = Math.round((offset + f.distanceAt(elapsed)) / width);
+      if (columns !== applied && !scroll(columns - applied)) { flingFrame.current = undefined; return; }
+      applied = columns;
+      flingFrame.current = elapsed < f.duration ? requestAnimationFrame(frame) : undefined;
+    };
+    flingFrame.current = requestAnimationFrame(frame);
+  };
+
   const onPointerDown = (e: PointerEvent) => {
-    drag.current = { startX: e.clientX, columns: 0, moved: false, active: true, longPressed: false };
+    // Touching a coasting chart only stops it, like on Android
+    const stoppedFling = stopFling();
+    drag.current = { startX: e.clientX, columns: 0, moved: false, active: true, longPressed: false, stoppedFling, samples: [{ t: e.timeStamp, x: e.clientX }] };
     (e.currentTarget as Element).setPointerCapture(e.pointerId);
     const rect = canvasRef.current!.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    if (props.readOnly) return;
+    if (props.readOnly || stoppedFling) return;
     longPressTimer.current = setTimeout(() => {
       if (drag.current.moved || !drag.current.active) return;
       drag.current.longPressed = true;
@@ -189,6 +225,8 @@ export function Chart(props: {
     const d = drag.current;
     const handle = handleRef.current;
     if (!d.active || !handle || handle.columnWidth <= 0) return;
+    d.samples.push({ t: e.timeStamp, x: e.clientX });
+    if (d.samples.length > 20) d.samples.shift();
     const dx = e.clientX - d.startX;
     if (Math.abs(dx) > TAP_SLOP_PX) {
       d.moved = true;
@@ -196,7 +234,7 @@ export function Chart(props: {
     }
     const columns = Math.round(dx / handle.columnWidth);
     if (columns !== d.columns) {
-      if (handle.scrollBy(columns - d.columns)) scrolled.current = Math.max(0, scrolled.current + columns - d.columns);
+      scroll(columns - d.columns);
       d.columns = columns;
     }
   };
@@ -204,7 +242,12 @@ export function Chart(props: {
     const d = drag.current;
     d.active = false;
     clearTimeout(longPressTimer.current);
-    if (props.readOnly || d.moved || d.longPressed || !handleRef.current) return;
+    if (d.moved && handleRef.current) {
+      const width = handleRef.current.columnWidth;
+      startFling(releaseVelocity(d.samples, e.timeStamp), e.clientX - d.startX - d.columns * width);
+      return;
+    }
+    if (props.readOnly || d.stoppedFling || d.longPressed || !handleRef.current) return;
     const rect = canvasRef.current!.getBoundingClientRect();
     handleRef.current.click(e.clientX - rect.left, e.clientY - rect.top);
   };

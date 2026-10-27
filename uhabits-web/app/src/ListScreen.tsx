@@ -190,7 +190,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   } else {
     topBar = (
       <TopBar
-        title="Alichka Habits"
+        title="Alichka Habits 🩵"
         right={
           <>
             <BarIcon name="add" label="Add habit" onClick={() => setDialog({ kind: "type" })} />
