@@ -10,6 +10,9 @@ import "./styles.css";
 
 const root = document.getElementById("app")!;
 
+// Safari ignores user-scalable=no; its own pinch events have to be cancelled too.
+for (const type of ["gesturestart", "gesturechange"]) document.addEventListener(type, (e) => e.preventDefault(), { passive: false });
+
 function showError(title: string, detail: unknown) {
   render(
     <div class="fatal">

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import confetti from "canvas-confetti";
 import type { HabitsCore } from "./core";
 import { Entry, PALETTE } from "./format";
+import { konfetti } from "./confetti";
 import { getBool, Pref } from "./prefs";
 
 // Ports of Android's CheckmarkDialog and NumberDialog (checkmark_popup.xml).
@@ -35,16 +35,9 @@ export function usePress(onTap: () => void, onLongPress: () => void) {
 /** Konfetti burst shown by Android when a habit is checked. */
 export function celebrate(color: string, x: number, y: number) {
   if (getBool(Pref.disableAnimation)) return;
-  void confetti({
-    particleCount: 40,
-    spread: 70,
-    startVelocity: 25,
-    ticks: 80,
-    scalar: 0.7,
-    colors: [color],
-    origin: { x: x / window.innerWidth, y: y / window.innerHeight },
-    disableForReducedMotion: true,
-  });
+  // Android skips it when system animations are off
+  if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  konfetti(color, x, y);
 }
 
 export interface PopupRequest {

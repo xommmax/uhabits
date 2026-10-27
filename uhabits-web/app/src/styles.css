@@ -73,6 +73,8 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { margin: 0; background: var(--bg); color: var(--text); }
+/* An app, not a page: no pinch or double-tap zoom (scrolling still works) */
+html { touch-action: pan-x pan-y; }
 body {
   font: 17px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
   -webkit-text-size-adjust: 100%;
@@ -91,6 +93,13 @@ button:disabled { opacity: 0.35; cursor: default; }
   min-height: 56px;
   padding: env(safe-area-inset-top) max(4px, env(safe-area-inset-right)) 0 max(4px, env(safe-area-inset-left));
   background: var(--toolbar); color: #fff;
+}
+/* iOS 27 blurs the status bar of home-screen apps unless a fixed element (taller than 10px, nearly full width)
+   sits at the top edge; it then paints the status bar in that element's background color
+   (WebKit's LocalFrameView::fixedContainerEdges). Clipped to text, the band itself draws nothing. */
+.status-band {
+  position: fixed; top: 0; left: 0; right: 0; height: 12px; z-index: 2147483647; pointer-events: none;
+  background-color: var(--toolbar); -webkit-background-clip: text; background-clip: text;
 }
 .topbar.no-left { padding-left: max(16px, env(safe-area-inset-left)); }
 .topbar:not(.no-left) .topbar-title { padding-left: 16px; }
