@@ -95,11 +95,12 @@ button:disabled { opacity: 0.35; cursor: default; }
   background: var(--toolbar); color: #fff;
 }
 /* iOS 27 blurs the status bar of home-screen apps unless a fixed element (taller than 10px, nearly full width)
-   sits at the top edge; it then paints the status bar in that element's background color
-   (WebKit's LocalFrameView::fixedContainerEdges). Clipped to text, the band itself draws nothing. */
+   sits at the top edge; it then paints the status bar in that element's color (WebKit's
+   LocalFrameView::fixedContainerEdges). An invisible band (background-clip: text) was not enough on a real
+   iOS 27 iPhone, so it paints, in the toolbar's own color over the toolbar; below dialogs, which dim it. */
 .status-band {
-  position: fixed; top: 0; left: 0; right: 0; height: 12px; z-index: 2147483647; pointer-events: none;
-  background-color: var(--toolbar); -webkit-background-clip: text; background-clip: text;
+  position: fixed; top: 0; left: 0; right: 0; height: 12px; z-index: 15; pointer-events: none;
+  background-color: var(--toolbar);
 }
 .topbar.no-left { padding-left: max(16px, env(safe-area-inset-left)); }
 .topbar:not(.no-left) .topbar-title { padding-left: 16px; }
