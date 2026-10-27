@@ -11,6 +11,11 @@ const SIZES = [
   { dp: 8, mass: 5 },
   { dp: 10, mass: 6 },
 ];
+// Each burst draws on a small canvas around its origin, big enough for where particles can still be seen
+// (at most 80 dp sideways or up before they stop, further down as they fall), instead of a full-screen one.
+const BOX = { side: 100, up: 100, down: 220 };
+// Tiny moving particles look the same at 2x; a 3x canvas would cost more than twice the pixels
+const MAX_RATIO = 2;
 
 interface Particle {
   x: number; y: number;
@@ -23,11 +28,17 @@ interface Particle {
   rotationSpeed2D: number; rotationSpeed3D: number;
 }
 
-interface Party { x: number; y: number; colors: string[]; created: number; pending: number; elapsedMs: number }
+interface Burst {
+  canvas: HTMLCanvasElement;
+  ctx: CanvasRenderingContext2D;
+  ratio: number;
+  x: number; y: number; // origin in the viewport
+  colors: string[];
+  particles: Particle[];
+  pending: number; elapsedMs: number; // emitter state
+}
 
-let canvas: HTMLCanvasElement | null = null;
-let parties: Party[] = [];
-let particles: Particle[] = [];
+let bursts: Burst[] = [];
 let lastTime = -1;
 let accumulator = 0;
 
@@ -46,18 +57,19 @@ function changeHue(hex: string, delta: number): string {
   return `rgb(${f(5)}, ${f(3)}, ${f(1)})`;
 }
 
-function createParticle(party: Party): Particle {
+/** A particle at the burst's origin; x and y are relative to it. */
+function createParticle(burst: Burst): Particle {
   const size = SIZES[Math.floor(Math.random() * SIZES.length)];
   const speed = 16 * Math.random(); // speed 0, maxSpeed 16
   const angle = Math.random() * 2 * Math.PI; // spread 360
   const rotationSpeed = () => 1 + 0.5 * (Math.random() * 2 - 1);
   return {
-    x: party.x, y: party.y,
+    x: 0, y: 0,
     vx: speed * Math.cos(angle), vy: speed * Math.sin(angle),
     ax: 0, ay: 0,
     width: size.dp, mass: size.mass + size.mass * Math.random() * 0.2,
     circle: Math.random() < 0.5,
-    color: party.colors[Math.floor(Math.random() * party.colors.length)],
+    color: burst.colors[Math.floor(Math.random() * burst.colors.length)],
     alpha: 255,
     rotation: 0, rotationWidth: size.dp, scaleX: 0,
     rotationSpeed2D: rotationSpeed() * 8, rotationSpeed3D: rotationSpeed() * 1.5,
@@ -65,21 +77,17 @@ function createParticle(party: Party): Particle {
 }
 
 /** One physics step of [dt] seconds (PartyEmitter.createConfetti + Confetti.render). */
-function step(dt: number, height: number) {
-  for (const party of parties) {
-    // Emitter(duration = 25 ms).max(25): one particle per ms while the 25 ms last
-    party.pending += dt;
-    if (party.pending >= 0.001 && party.elapsedMs < 25) {
-      const amount = Math.floor(party.pending / 0.001);
-      for (let i = 0; i < amount; i++) particles.push(createParticle(party));
-      party.created += amount;
-      party.pending %= 0.001;
-    }
-    party.elapsedMs += dt * 1000;
+function step(burst: Burst, dt: number, height: number) {
+  // Emitter(duration = 25 ms).max(25): one particle per ms while the 25 ms last
+  burst.pending += dt;
+  if (burst.pending >= 0.001 && burst.elapsedMs < 25) {
+    const amount = Math.floor(burst.pending / 0.001);
+    for (let i = 0; i < amount; i++) burst.particles.push(createParticle(burst));
+    burst.pending %= 0.001;
   }
-  parties = parties.filter((p) => p.elapsedMs < 25);
-  for (const p of particles) {
-    if (p.y > height) { p.alpha = 0; continue; }
+  burst.elapsedMs += dt * 1000;
+  for (const p of burst.particles) {
+    if (burst.y + p.y > height) { p.alpha = 0; continue; }
     p.ay += GRAVITY / p.mass; // Konfetti never resets the acceleration
     p.vx += p.ax; p.vy += p.ay;
     p.vx *= 0.9; p.vy *= 0.9;
@@ -91,17 +99,18 @@ function step(dt: number, height: number) {
     if (p.rotationWidth < 0) p.rotationWidth = p.width;
     p.scaleX = Math.abs(p.rotationWidth / p.width - 0.5) * 2;
   }
-  particles = particles.filter((p) => p.alpha > 0);
+  burst.particles = burst.particles.filter((p) => p.alpha > 0);
 }
 
-function draw(ctx: CanvasRenderingContext2D) {
-  const ratio = window.devicePixelRatio || 1;
+/** KonfettiView.display, with the origin at (BOX.side, BOX.up) of the burst's canvas. */
+function draw(burst: Burst) {
+  const { ctx, ratio } = burst;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  for (const p of particles) {
+  ctx.clearRect(0, 0, burst.canvas.width, burst.canvas.height);
+  for (const p of burst.particles) {
     const centerX = (p.scaleX * p.width) / 2;
     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-    ctx.translate(p.x - centerX, p.y);
+    ctx.translate(BOX.side + p.x - centerX, BOX.up + p.y);
     ctx.translate(centerX, p.width / 2);
     ctx.rotate((p.rotation * Math.PI) / 180);
     ctx.translate(-centerX, -p.width / 2);
@@ -119,34 +128,38 @@ function draw(ctx: CanvasRenderingContext2D) {
 }
 
 function frame(time: number) {
-  if (!canvas) return;
   // Like Konfetti's TimerIntegration, the first frame only starts the clock (rAF times only, never mixed with performance.now)
   accumulator = lastTime < 0 ? 0 : Math.min(accumulator + (time - lastTime) / 1000, 0.25);
   lastTime = time;
   while (accumulator >= STEP) {
-    step(STEP, window.innerHeight);
+    for (const burst of bursts) step(burst, STEP, window.innerHeight);
     accumulator -= STEP;
   }
-  draw(canvas.getContext("2d")!);
-  if (particles.length || parties.length) {
-    requestAnimationFrame(frame);
-  } else {
-    canvas.remove();
-    canvas = null;
+  for (const burst of bursts) {
+    if (burst.particles.length || burst.elapsedMs < 25) draw(burst);
+    else burst.canvas.remove();
   }
+  bursts = bursts.filter((b) => b.canvas.isConnected);
+  if (bursts.length) requestAnimationFrame(frame);
+  else lastTime = -1;
 }
 
 /** Starts a burst at (x, y) in the habit's [color] and three hue-shifted variants, as Android does. */
 export function konfetti(color: string, x: number, y: number) {
-  parties.push({ x, y, colors: [changeHue(color, 180), changeHue(color, 20), changeHue(color, -20), color], created: 0, pending: 0, elapsedMs: 0 });
-  if (canvas) return;
-  canvas = document.createElement("canvas");
-  const ratio = window.devicePixelRatio || 1;
-  canvas.width = Math.round(window.innerWidth * ratio);
-  canvas.height = Math.round(window.innerHeight * ratio);
-  Object.assign(canvas.style, { position: "fixed", inset: "0", width: "100vw", height: "100vh", pointerEvents: "none", zIndex: "30" });
+  const canvas = document.createElement("canvas");
+  const ratio = Math.min(window.devicePixelRatio || 1, MAX_RATIO);
+  const width = 2 * BOX.side, height = BOX.up + BOX.down;
+  canvas.width = Math.round(width * ratio);
+  canvas.height = Math.round(height * ratio);
+  Object.assign(canvas.style, {
+    position: "fixed", left: `${x - BOX.side}px`, top: `${y - BOX.up}px`, width: `${width}px`, height: `${height}px`,
+    pointerEvents: "none", zIndex: "30",
+  });
   document.body.appendChild(canvas);
-  accumulator = 0;
-  lastTime = -1;
-  requestAnimationFrame(frame);
+  bursts.push({
+    canvas, ctx: canvas.getContext("2d")!, ratio, x, y,
+    colors: [changeHue(color, 180), changeHue(color, 20), changeHue(color, -20), color],
+    particles: [], pending: 0, elapsedMs: 0,
+  });
+  if (bursts.length === 1) requestAnimationFrame(frame);
 }

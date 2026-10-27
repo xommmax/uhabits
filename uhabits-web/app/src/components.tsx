@@ -54,11 +54,21 @@ export const BarIcon = (props: { name: keyof typeof MATERIAL; label: string; onC
 /** Android's toolbar: colorPrimary (or the habit's color), white title on the left. */
 export function TopBar(props: { left?: ComponentChildren; title?: ComponentChildren; right?: ComponentChildren; color?: string }) {
   const background = props.color ? { background: props.color } : undefined;
+  const ref = useRef<HTMLElement>(null);
+  // Its height (taller under an iPhone's status bar) is where sticky content below it, like the list's day row, stops
+  useEffect(() => {
+    const header = ref.current!;
+    const update = () => document.documentElement.style.setProperty("--topbar-height", `${header.offsetHeight}px`);
+    const observer = new ResizeObserver(update);
+    observer.observe(header);
+    update();
+    return () => observer.disconnect();
+  }, []);
   return (
     <>
       {/* Outside the toolbar's stacking context, so menus and dialogs never cover it */}
       <div class="status-band" aria-hidden="true" style={props.color ? { backgroundColor: props.color } : undefined} />
-      <header class={`topbar${props.left ? "" : " no-left"}`} style={background}>
+      <header ref={ref} class={`topbar${props.left ? "" : " no-left"}`} style={background}>
         {props.left}
         <div class="topbar-title">{props.title}</div>
         <div class="topbar-right">{props.right}</div>
