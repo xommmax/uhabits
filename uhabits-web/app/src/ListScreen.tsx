@@ -5,7 +5,7 @@ import { BarIcon, Menu, type MenuItem, Ring, TopBar, useDarkMode } from "./compo
 import { shareBackup, shouldRemind, snoozeReminder } from "./backup";
 import { Entry, formatDay, shortNumber } from "./format";
 import { celebrate, ColorPicker, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
-import { haptic } from "./haptics";
+import { canVibrate, haptic } from "./haptics";
 import { getBool, Pref } from "./prefs";
 import { isNightMode, toggleNightMode } from "./theme";
 
@@ -430,7 +430,7 @@ function CheckButton(props: {
   onPopup: (x: number, y: number) => void;
 }) {
   const { habit, value, color } = props;
-  const ref = useRef<HTMLButtonElement>(null);
+  const ref = useRef<HTMLLabelElement>(null);
   const at = (fn: (x: number, y: number) => void) => () => {
     const r = ref.current!.getBoundingClientRect();
     fn(r.left + r.width / 2, r.top + r.height / 2);
@@ -438,7 +438,7 @@ function CheckButton(props: {
   const shortToggle = getBool(Pref.shortToggle);
   // Like Android: a tick on every toggle (CheckmarkButton.performToggle) and on every long press (View.performLongClick)
   const toggle = (x: number, y: number) => {
-    haptic("toggle");
+    if (canVibrate) haptic("toggle"); // on an iPhone the tap on the cell's switch plays it
     props.onToggle(x, y);
   };
   const longPressed = (fn: (x: number, y: number) => void) => (x: number, y: number) => {
@@ -450,14 +450,17 @@ function CheckButton(props: {
     : usePress(at(shortToggle ? toggle : props.onPopup), at(longPressed(shortToggle ? props.onPopup : toggle)));
   const hasNotes = habit.notes[props.index].trim() !== "";
   return (
-    <button ref={ref} class="check" {...press}>
+    // A label: on an iPhone, a real tap on it toggles the hidden iOS switch inside, and iOS plays its haptic tick
+    // (Safari has no vibration API, and switches toggled from code stay silent)
+    <label ref={ref} class="check" {...press}>
+      {!canVibrate && <input type="checkbox" class="haptic-switch" tabIndex={-1} aria-hidden="true" {...{ switch: true }} onClick={(e) => e.stopPropagation()} />}
       {habit.numerical ? (
         <NumberCell value={value} completed={habit.completed[props.index]} unit={habit.unit} color={color} />
       ) : (
         <CheckCell value={value} color={color} />
       )}
       {hasNotes && <span class="notes-dot" style={{ background: color }} />}
-    </button>
+    </label>
   );
 }
 

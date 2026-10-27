@@ -6,6 +6,9 @@
 
 const VIBRATION_MS = { toggle: 20, key: 10 } as const;
 
+/** Android browsers; elsewhere (iPhone), checkmark cells are labels of a real switch so a real tap plays the tick */
+export const canVibrate = typeof navigator.vibrate === "function";
+
 export function haptic(kind: keyof typeof VIBRATION_MS) {
   if (typeof navigator.vibrate === "function") {
     navigator.vibrate(VIBRATION_MS[kind]);
