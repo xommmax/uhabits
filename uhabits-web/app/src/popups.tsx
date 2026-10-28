@@ -185,16 +185,42 @@ export function HabitTypePicker(props: { onPick: (numerical: boolean) => void; o
 }
 
 /** Android's ColorPickerDialog: the 20 palette colors. */
-export function ColorPicker(props: { selected?: number; onPick: (index: number) => void; onClose: () => void }) {
+/**
+ * Android's 20-color palette, plus "Custom…", which opens the phone's own color picker
+ * (Apple's color sheet on an iPhone, Chrome's picker on Android).
+ */
+export function ColorPicker(props: {
+  selected?: number;
+  custom?: string | null;
+  onPick: (index: number) => void;
+  onPickCustom: (hex: string) => void;
+  onClose: () => void;
+}) {
+  const custom = props.custom ?? null;
   return (
     <div class="overlay center" onClick={props.onClose}>
       <div class="color-picker" onClick={(e) => e.stopPropagation()}>
         <div class="dialog-title">Change color</div>
         <div class="swatches">
           {PALETTE.map((hex, i) => (
-            <button class={`swatch${props.selected === i ? " selected" : ""}`} style={{ background: hex }} aria-label={`Color ${i + 1}`} onClick={() => props.onPick(i)} />
+            <button
+              class={`swatch${custom === null && props.selected === i ? " selected" : ""}`}
+              style={{ background: hex }}
+              aria-label={`Color ${i + 1}`}
+              onClick={() => props.onPick(i)}
+            />
           ))}
         </div>
+        {/* A real tap on the (invisible) color input is needed for iOS to open its picker */}
+        <label class="custom-color">
+          <span class={`swatch custom-swatch${custom !== null ? " selected" : ""}`} style={custom !== null ? { background: custom } : undefined} />
+          Custom…
+          <input
+            type="color"
+            value={custom ?? (props.selected !== undefined ? PALETTE[props.selected] : PALETTE[0])}
+            onChange={(e) => props.onPickCustom(e.currentTarget.value.toUpperCase())}
+          />
+        </label>
       </div>
     </div>
   );

@@ -8,6 +8,8 @@ export interface HabitSummary {
   colorIndex: number;
   colorLight: string;
   colorDark: string;
+  /** "#RRGGBB" picked outside the palette (colorIndex is then the nearest palette color), or null. */
+  customColor: string | null;
   archived: boolean;
   numerical: boolean;
   unit: string;
@@ -45,6 +47,7 @@ export interface HabitForm {
   question: string;
   description: string;
   colorIndex: number;
+  customColor: string | null;
   freqNum: number;
   freqDen: number;
   numerical: boolean;

@@ -108,6 +108,7 @@ class HabitsCore internal constructor(
     private val lightTheme = LightTheme()
     private val darkTheme = DarkTheme()
     private val pureBlackTheme = PureBlackTheme()
+    private val customColors = CustomColors(db)
 
     init {
         setToday(computeToday(preferences.midnightDelayHours, 0))
@@ -219,8 +220,13 @@ class HabitsCore internal constructor(
     fun categories(): Array<String> =
         habitList.map { it.category.trim() }.filter { it.isNotEmpty() }.distinct().sorted().toTypedArray()
 
-    fun changeColor(ids: Array<Int>, colorIndex: Int) =
-        execute(ChangeHabitColorCommand(habitList, ids.map(::habit), PaletteColor(colorIndex)))
+    /** [customColor] ("#RRGGBB") replaces the palette color [colorIndex] when not null. */
+    fun changeColor(ids: Array<Int>, colorIndex: Int, customColor: String?) {
+        val habits = ids.map(::habit)
+        val rgb = customColor?.let(::parseHex)
+        habits.forEach { customColors.set(it.uuid!!, rgb) }
+        execute(ChangeHabitColorCommand(habitList, habits, PaletteColor(rgb?.let(::nearestPaletteIndex) ?: colorIndex)))
+    }
 
     fun changeCategory(ids: Array<Int>, category: String) =
         execute(ChangeHabitCategoryCommand(habitList, ids.map(::habit), category.trim()))
@@ -269,7 +275,9 @@ class HabitsCore internal constructor(
         model.name = form.name.unsafeCast<String>()
         model.question = form.question.unsafeCast<String>()
         model.description = form.description.unsafeCast<String>()
-        model.color = PaletteColor(form.colorIndex.unsafeCast<Int>())
+        val customColor = form.customColor.unsafeCast<String?>()?.let(::parseHex)
+        model.color = PaletteColor(customColor?.let(::nearestPaletteIndex) ?: form.colorIndex.unsafeCast<Int>())
+        customColors.set(model.uuid!!, customColor)
         model.category = form.category.unsafeCast<String?>()?.trim() ?: model.category
         model.frequency = Frequency(form.freqNum.unsafeCast<Int>(), form.freqDen.unsafeCast<Int>())
         model.type = if (form.numerical.unsafeCast<Boolean>()) HabitType.NUMERICAL else HabitType.YES_NO
@@ -319,7 +327,11 @@ class HabitsCore internal constructor(
 
     fun unarchive(ids: Array<Int>) = execute(UnarchiveHabitsCommand(habitList, ids.map(::habit)))
 
-    fun delete(ids: Array<Int>) = execute(DeleteHabitsCommand(habitList, ids.map(::habit)))
+    fun delete(ids: Array<Int>) {
+        val habits = ids.map(::habit)
+        habits.forEach { customColors.set(it.uuid!!, null) }
+        execute(DeleteHabitsCommand(habitList, habits))
+    }
 
     /** Moves habit [id] right before (or after) habit [refId]. */
     fun move(id: Int, refId: Int, before: Boolean) {
@@ -330,7 +342,7 @@ class HabitsCore internal constructor(
     }
 
     fun historyChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean, padding: Double): ChartHandle =
-        buildHistoryChart(canvas, habit(id), habitList, preferences, theme(dark), padding) { execute(it) }
+        habit(id).let { buildHistoryChart(canvas, it, habitList, preferences, theme(it, dark), padding) { c -> execute(c) } }
 
     /** [bucket] is the position in Android's bar card spinner (Week..Year, or Day..Year if numerical). */
     fun barChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean, bucket: Int): ChartHandle {
@@ -340,23 +352,23 @@ class HabitsCore internal constructor(
         } else {
             preferences.barCardBoolSpinnerPosition = bucket
         }
-        return buildBarChart(canvas, habit, preferences, theme(dark))
+        return buildBarChart(canvas, habit, preferences, theme(habit, dark))
     }
 
     /** [bucket] is the position in Android's score card spinner (Day, Week, Month, Quarter, Year). */
     fun scoreChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean, bucket: Int): ChartHandle {
         preferences.scoreCardSpinnerPosition = bucket
-        return buildScoreChart(canvas, habit(id), preferences, theme(dark))
+        return habit(id).let { buildScoreChart(canvas, it, preferences, theme(it, dark)) }
     }
 
     fun frequencyChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
-        buildFrequencyChart(canvas, habit(id), preferences, theme(dark))
+        habit(id).let { buildFrequencyChart(canvas, it, preferences, theme(it, dark)) }
 
     fun streakChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
-        buildStreakChart(canvas, habit(id), theme(dark))
+        habit(id).let { buildStreakChart(canvas, it, theme(it, dark)) }
 
     fun targetChart(canvas: HTMLCanvasElement, id: Int, dark: Boolean): ChartHandle =
-        buildTargetChart(canvas, habit(id), preferences, theme(dark))
+        habit(id).let { buildTargetChart(canvas, it, preferences, theme(it, dark)) }
 
     /**
      * Zip of CSV files for the given habits, or for all habits when [ids] is empty
@@ -400,8 +412,9 @@ class HabitsCore internal constructor(
             val file = fileOpener.openUserFile(path)
             val opener = WebDatabaseOpener(sqlJs, storage)
             val logging = StandardLogging()
+            val loopImporter = LoopDBImporter(habitList, modelFactory, opener, commandRunner, logging, fileOpener)
             val importer = GenericImporter(
-                LoopDBImporter(habitList, modelFactory, opener, commandRunner, logging, fileOpener),
+                loopImporter,
                 RewireDBImporter(habitList, modelFactory, opener),
                 TickmateDBImporter(habitList, modelFactory, opener),
                 HabitBullCSVImporter(habitList, modelFactory, logging)
@@ -413,6 +426,11 @@ class HabitsCore internal constructor(
             }
             if (!recognized) return@promise false
             importer.importHabitsFromFile(file)
+            if (loopImporter.canHandle(file)) {
+                val source = WebDatabase(sqlJs, data)
+                customColors.importFrom(source)
+                source.close()
+            }
             true
         } finally {
             storage.delete(path)
@@ -426,10 +444,11 @@ class HabitsCore internal constructor(
 
     private fun habit(id: Int): Habit = habitList.getById(id.toLong()) ?: error("Habit not found: $id")
 
-    private fun theme(dark: Boolean) = when {
-        !dark -> lightTheme
-        preferences.isPureBlackEnabled -> pureBlackTheme
-        else -> darkTheme
+    /** Theme for [habit]'s charts, with its custom color if it has one. */
+    private fun theme(habit: Habit, dark: Boolean) = when {
+        !dark -> customColors.lightTheme(habit, lightTheme)
+        preferences.isPureBlackEnabled -> customColors.darkTheme(habit, pureBlackTheme)
+        else -> customColors.darkTheme(habit, darkTheme)
     }
 
     private fun habitSummary(habit: Habit): dynamic {
@@ -439,8 +458,9 @@ class HabitsCore internal constructor(
         result.question = habit.question
         result.description = habit.description
         result.colorIndex = habit.color.paletteIndex
-        result.colorLight = lightTheme.color(habit.color).toHex()
-        result.colorDark = darkTheme.color(habit.color).toHex()
+        result.colorLight = customColors.lightTheme(habit, lightTheme).color(habit.color).toHex()
+        result.colorDark = customColors.darkTheme(habit, darkTheme).color(habit.color).toHex()
+        result.customColor = customColors.get(habit)?.let { Color(it).toHex() }
         result.archived = habit.isArchived
         result.numerical = habit.isNumerical
         result.unit = habit.unit
@@ -453,6 +473,8 @@ class HabitsCore internal constructor(
         return result
     }
 }
+
+private fun parseHex(hex: String): Int = hex.removePrefix("#").toInt(16)
 
 private fun Color.toHex(): String {
     fun channel(v: Double) = (v * 255).roundToInt().coerceIn(0, 255).toString(16).padStart(2, '0')

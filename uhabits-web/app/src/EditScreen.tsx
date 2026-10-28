@@ -2,7 +2,7 @@ import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitDetail, HabitForm } from "./types";
-import { BarIcon, MaterialIcon, TopBar, useDarkMode } from "./components";
+import { BarIcon, MaterialIcon, TopBar } from "./components";
 import { frequencyText, PALETTE } from "./format";
 import { ColorPicker } from "./popups";
 
@@ -23,17 +23,16 @@ interface Props {
 
 /** Android's EditHabitActivity (activity_edit_habit.xml), without the reminder. */
 export function EditScreen({ core, id, numerical, onDone }: Props) {
-  const dark = useDarkMode();
   const [form, setForm] = useState<HabitForm>(() => {
     if (id === null) {
       return {
-        id: null, name: "", question: "", description: "", colorIndex: DEFAULT_COLOR,
+        id: null, name: "", question: "", description: "", colorIndex: DEFAULT_COLOR, customColor: null,
         freqNum: 1, freqDen: 1, numerical, unit: "", targetValue: 0, targetType: 0, category: "",
       };
     }
     const h = core.habitDetail(id) as HabitDetail;
     return {
-      id, name: h.name, question: h.question, description: h.description, colorIndex: h.colorIndex,
+      id, name: h.name, question: h.question, description: h.description, colorIndex: h.colorIndex, customColor: h.customColor,
       freqNum: h.freqNum, freqDen: h.freqDen, numerical: h.numerical, unit: h.unit,
       targetValue: h.targetValue, targetType: h.targetType, category: h.category,
     };
@@ -43,6 +42,7 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
   const [showErrors, setShowErrors] = useState(false);
   const [editingCategory, setEditingCategory] = useState(false);
   const update = (patch: Partial<HabitForm>) => setForm({ ...form, ...patch });
+  const color = form.customColor ?? PALETTE[form.colorIndex];
 
   const target = Number(targetText.replace(",", "."));
   const nameError = form.name.trim() === "";
@@ -75,7 +75,7 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
   return (
     <div class="screen edit-screen">
       <TopBar
-        color={dark ? undefined : PALETTE[form.colorIndex]}
+        color={color}
         left={<BarIcon name="back" label="Back" onClick={onDone} />}
         title={id === null ? "Create habit" : "Edit habit"}
         right={<button class="outlined-button" onClick={save}>Save</button>}
@@ -92,7 +92,7 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
             />
           </Field>
           <Field label="Color" narrow>
-            <button class="color-button" style={{ background: PALETTE[form.colorIndex] }} aria-label="Change color" onClick={() => setDialog("color")} />
+            <button class="color-button" style={{ background: color }} aria-label="Change color" onClick={() => setDialog("color")} />
           </Field>
         </div>
         <Field label="Question">
@@ -150,7 +150,13 @@ export function EditScreen({ core, id, numerical, onDone }: Props) {
       </div>
 
       {dialog === "color" && (
-        <ColorPicker selected={form.colorIndex} onClose={() => setDialog(null)} onPick={(colorIndex) => { setDialog(null); update({ colorIndex }); }} />
+        <ColorPicker
+          selected={form.colorIndex}
+          custom={form.customColor}
+          onClose={() => setDialog(null)}
+          onPick={(colorIndex) => { setDialog(null); update({ colorIndex, customColor: null }); }}
+          onPickCustom={(customColor) => { setDialog(null); update({ customColor }); }}
+        />
       )}
       {dialog === "frequency" && (
         <FrequencyDialog

@@ -328,7 +328,8 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
       {dialog?.kind === "color" && (
         <ColorPicker
           onClose={() => setDialog(null)}
-          onPick={(index) => { setDialog(null); core.changeColor(ids(), index); afterBulk(); }}
+          onPick={(index) => { setDialog(null); core.changeColor(ids(), index, null); afterBulk(); }}
+          onPickCustom={(hex) => { setDialog(null); core.changeColor(ids(), 0, hex); afterBulk(); }}
         />
       )}
       {dialog?.kind === "category" && (
