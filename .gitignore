@@ -17,6 +17,5 @@ node_modules
 *xcuserdata*
 *.sketch
 crowdin.yml
-kotlin-js-store
 .kotlin
 uhabits-web/app/dist
