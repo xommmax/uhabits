@@ -12,7 +12,7 @@ at least before a risky deploy.
 `npm test` runs unit + bridge. `npm run test:coverage` shows the unit tests' coverage of `app/src` (about 99% of lines).
 
 Last result (2026-10-28, 1.0.12): unit 347, bridge 82 (including bridge.mjs 123/123, customcolor.mjs, imports.mjs),
-UI 232 checks in Chromium. All pass; one warning, below.
+UI 233 checks in Chromium. All pass.
 
 ## Unit tests (`app/test/unit`, Vitest + happy-dom)
 Every source file of `app/src` except `main.tsx`. Screens run against `fake-core.ts`, an in-memory stand-in for
@@ -58,13 +58,9 @@ to override). `ENGINES=chromium,webkit` chooses engines; WebKit is skipped when 
 | `e2e.js` | The full suite (166 checks): first run, create/edit/delete, toggles, popups, measurable habits, categories, sorting, filters, reorder, charts, settings, backup export/import, time zones and midnight, custom colours, old Loop and other apps' imports, number display. `node e2e.js <out>` |
 | `dayscroll.js` | Dragging the dates moves the days smoothly, snaps to a day, keeps the cells aligned, stops at 60 days and at today |
 | `haptics.js` | Vibrate on Android; on the iPhone path (no Vibration API, also simulated in Chromium) the cell's own switch and the temporary one |
-| `fixes.js` | Status band (painted, in the toolbar colour, covered by dialogs), zoom blocking, confetti |
+| `fixes.js` | Status band (painted, in the toolbar colour, covered by dialogs, hiding nothing of the toolbar), zoom blocking, confetti |
 | `flingtest.js` | Chart fling. Makes its own data with `bridge.mjs`, or `node flingtest.js <backup.db>` |
 | `offline.js` | Works offline after the service worker installs: starts its own server on :4174, stops it, reloads |
-
-**Warning, not failure (`fixes.js`):** with no status-bar inset, the 12px status band covers the top of the
-toolbar, hiding the top 2px of the edit screen's outlined Save button. On the iPhone the opaque (`black`) status bar
-probably also gives an inset of 0, so it is likely visible there. See `docs/HISTORY.md` → Open items.
 
 ## Testing tips learned the hard way
 - Playwright mouse moves can't exceed ~1200 px/s. Test the fling velocity estimator in Node, not by flicking.

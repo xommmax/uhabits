@@ -52,10 +52,9 @@ const { check, done } = checker("fix checks");
     await p.evaluate(() => document.querySelectorAll(".status-band").forEach((b) => (b.style.display = "")));
     const same = Buffer.compare(a, bShot) === 0;
     if (!same) { const f = `${engine}-${where.replace(/[^a-z]+/gi, "-")}`; fs.writeFileSync(`${OUT}/with-${f}.png`, a); fs.writeFileSync(`${OUT}/without-${f}.png`, bShot); }
-    // Without a status-bar inset (here, and probably on the iPhone with the opaque status bar) the 12px band covers
-    // the top 12px of the toolbar: anything drawn there (the edit screen's Save outline) is hidden. Reported, not failed.
-    if (same) check(`${where}: band hides nothing (pixel-identical)`, true);
-    else console.log(`  WARN ${where}: the band covers part of the toolbar's content (see ${OUT}/with-…png vs without-…png)`);
+    // Without a status-bar inset (here, and on the iPhone with the opaque status bar) the band covers the top 12px of
+    // the toolbar, so nothing may be drawn there (the edit screen's Save button once was)
+    check(`${where}: band hides nothing of the toolbar (pixel-identical)`, same);
     return r.bandColor;
   };
   await band("list");

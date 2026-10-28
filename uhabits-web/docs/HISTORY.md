@@ -40,7 +40,7 @@ official iOS app if one appears). Started 2026-10-25, built with Claude Code.
 | 1.0.9 | 10-27 | iPhone haptics via real hidden switches in check cells |
 | 1.0.10 | 10-28 | Custom habit colours; habit-coloured edit toolbar in dark mode too |
 | 1.0.11 | 10-28 | Smooth drag-and-snap day scrolling on the date header, 60-day limit; CI lockfile fix |
-| 1.0.12 | 10-28 | Test suite (unit, bridge, UI) and fixes it found: old Loop backups (before DB v24) failed to import; Rewire/Tickmate check-ins only showed after reopening; failed imports said nothing; numbers like 12.04 showed "12" (Android: "12.0"); dates in the header were selectable. **Not deployed yet** |
+| 1.0.12 | 10-28 | Test suite (unit, bridge, UI) and fixes it found: old Loop backups (before DB v24) failed to import; Rewire/Tickmate check-ins only showed after reopening; failed imports said nothing; numbers like 12.04 showed "12" (Android: "12.0"); dates in the header were selectable; the status band cropped the top of the edit screen's Save button (now 32px tall instead of Android's 36dp) |
 
 Owner confirmed on Android: confetti, vibration, and fling feel identical to Android. On the iPhone everything in
 1.0.11 was reported working by the owner (2026-10-28).
@@ -58,9 +58,6 @@ Owner confirmed on Android: confetti, vibration, and fling feel identical to And
 - CI: `ubuntu-latest` is moving to a newer image, and some actions are on deprecated Node versions. Pin
   `ubuntu-24.04` and bump actions if builds break.
 - When Android releases DB v26, make v26 (with categories) the default backup.
-- The 12px status band covers the top of the toolbar where there is no status-bar inset, which hides the top 2px
-  of the edit screen's outlined Save button (`fixes.js` warns). Probably visible on the iPhone (opaque status bar,
-  inset 0). Check on the device before changing the band (its size is what iOS 27 needs to pick the colour).
 - Tests don't run in CI. Running `npm test` in the deploy workflow before the build would stop a broken deploy.
 - WebKit UI tests were not run in the cloud session that wrote them (WebKit not installed); run with
   `ENGINES=webkit` on the Mac.

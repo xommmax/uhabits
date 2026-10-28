@@ -11,6 +11,9 @@ Each item names the code that handles it.
   the toolbar's stacking context (z-index 15, below dialogs, which dim it). An invisible band
   (background-clip:text) did not work on a real iPhone. Use `backgroundColor`, never the `background`
   shorthand (it resets background-clip).
+- With the opaque status bar the top inset is 0, so the band covers the toolbar's top 12px on every phone. Nothing
+  may be drawn there: the edit screen's Save button is 32px tall (Android: 36dp) so it starts at 12px.
+  `fixes.js` checks this pixel by pixel.
 - `index.html`: `apple-mobile-web-app-status-bar-style` is **`black`** (opaque), not `black-translucent`.
   Translucent lets content go under the status bar, which is where the blur came from. The style is read
   only when the app is added to the home screen, so changing it needs a re-install.
