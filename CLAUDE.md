@@ -27,8 +27,9 @@ Everything you need to work on the web app is in these files. Read them before c
 
 ## Working rules (from the owner)
 
-1. **Never push to `web-pwa` without an explicit "deploy"** from the owner. Committing locally is fine.
-   "Sounds good" about a plan is not approval.
+1. **Work directly on `web-pwa`**, not on a separate `claude/...` session branch: check it out at the start and
+   commit there. **Never push to it without an explicit "deploy"** from the owner. Committing locally is fine.
+   "Sounds good" about a plan is not approval. (Owner's choice, 2026-10-28: keep the deploy gate.)
 2. Bump `version` in `uhabits-web/app/package.json` (and `package-lock.json`) for every deploy. The About
    screen shows the version, commit and build time, so the owner can tell which build is installed.
 3. After pushing, say which version/commit was pushed. Don't poll CI unless asked.
