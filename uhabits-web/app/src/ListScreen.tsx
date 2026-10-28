@@ -6,6 +6,7 @@ import { shareBackup, shouldRemind, snoozeReminder } from "./backup";
 import { Entry, formatDay, shortNumber } from "./format";
 import { celebrate, ColorPicker, EntryPopup, GLYPH, HabitTypePicker, type PopupRequest, usePress } from "./popups";
 import { canVibrate, haptic } from "./haptics";
+import { useDayScroll } from "./dayScroll";
 import { getBool, Pref } from "./prefs";
 import { isNightMode, toggleNightMode } from "./theme";
 
@@ -85,12 +86,19 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   const rowRefs = useRef(new Map<number, HTMLDivElement>());
   void rev;
 
-  const habits = core.listHabits("", columns) as HabitRow[];
+  const reversed = getBool(Pref.reverseDays);
+  const dayScroll = useDayScroll(COLUMN_WIDTH, reversed);
+  // The visible days plus one on each side, which come into view while scrolling
+  const firstDaysAgo = dayScroll.offset - 1;
+  const habits = core.listHabits("", columns + 2, firstDaysAgo) as HabitRow[];
   const options = core.listOptions() as { showArchived: boolean; showCompleted: boolean; order: string; hasHabits: boolean };
   const manualOrder = options.order === "BY_POSITION";
   const today = core.today();
-  const reversed = getBool(Pref.reverseDays);
-  const dayIndexes = Array.from({ length: columns }, (_, i) => (reversed ? columns - 1 - i : i));
+  // Left to right, one hidden day on each side; index is the day's position in each habit's values
+  const days: Day[] = Array.from({ length: columns + 2 }, (_, j) => {
+    const daysAgo = dayScroll.offset + (reversed ? columns - j : j - 1);
+    return { daysAgo, index: daysAgo - firstDaysAgo };
+  });
   const colorOf = (h: HabitRow) => (dark ? h.colorDark : h.colorLight);
   const selectedHabits = habits.filter((h) => selected.has(h.id));
   const selecting = selected.size > 0;
@@ -228,7 +236,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
         rowRef={(el) => (el ? rowRefs.current.set(h.id, el) : rowRefs.current.delete(h.id))}
         habit={h}
         color={colorOf(h)}
-        dayIndexes={dayIndexes}
+        days={days}
         selected={selected.has(h.id)}
         style={drag ? { transform: `translateY(${isDragged ? drag.dy : dragShift(i)}px)` } : undefined}
         dragClass={drag ? (isDragged ? " dragging" : " shifting") : ""}
@@ -239,13 +247,13 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
         }}
         onDragMove={(dy) => drag && setDrag({ ...drag, dy })}
         onDragEnd={endDrag}
-        onToggle={(i, x, y) => {
-          const value = core.toggle(h.id, today - i);
+        onToggle={(daysAgo, x, y) => {
+          const value = core.toggle(h.id, today - daysAgo);
           if (value === Entry.YES_MANUAL) celebrate(colorOf(h), x, y);
           refresh();
         }}
-        onPopup={(i, x, y) =>
-          setPopup({ habitId: h.id, day: today - i, numerical: h.numerical, color: colorOf(h), atLeast: h.targetType === 0, x, y })
+        onPopup={(daysAgo, x, y) =>
+          setPopup({ habitId: h.id, day: today - daysAgo, numerical: h.numerical, color: colorOf(h), atLeast: h.targetType === 0, x, y })
         }
       />,
     );
@@ -279,15 +287,19 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
         </button>
       )}
 
-      <div class="habit-list">
-        <div class="list-header">
+      <div class="habit-list" ref={dayScroll.listRef}>
+        <div class="list-header" {...dayScroll.handlers}>
           <div class="list-header-spacer" />
-          {dayIndexes.map((i) => (
-            <div class="day-label">
-              <span>{formatDay(today - i, { weekday: "short" }).toUpperCase()}</span>
-              <span>{formatDay(today - i, { day: "numeric" })}</span>
+          <div class="days" style={{ width: `${columns * COLUMN_WIDTH}px` }}>
+            <div class="days-track">
+              {days.map(({ daysAgo }) => (
+                <div key={daysAgo} class="day-label">
+                  {daysAgo >= 0 && <span>{formatDay(today - daysAgo, { weekday: "short" }).toUpperCase()}</span>}
+                  {daysAgo >= 0 && <span>{formatDay(today - daysAgo, { day: "numeric" })}</span>}
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
         </div>
         {rows}
       </div>
@@ -345,10 +357,16 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   );
 }
 
+interface Day {
+  daysAgo: number;
+  /** Position of the day in the habit's values, notes and completed arrays. */
+  index: number;
+}
+
 interface RowProps {
   habit: HabitRow;
   color: string;
-  dayIndexes: number[];
+  days: Day[];
   selected: boolean;
   style?: Record<string, string>;
   dragClass: string;
@@ -407,16 +425,25 @@ function HabitRowView(props: RowProps) {
         <Ring value={habit.score} color={color} size={15} thickness={3} />
         <span style={{ color }}>{habit.name}</span>
       </button>
-      {props.dayIndexes.map((i) => (
-        <CheckButton
-          habit={habit}
-          index={i}
-          value={habit.values[i]}
-          color={color}
-          onToggle={(x, y) => props.onToggle(i, x, y)}
-          onPopup={(x, y) => props.onPopup(i, x, y)}
-        />
-      ))}
+      <div class="days" style={{ width: `${(props.days.length - 2) * COLUMN_WIDTH}px` }}>
+        <div class="days-track">
+          {props.days.map(({ daysAgo, index }) =>
+            daysAgo < 0 ? (
+              <div key={daysAgo} class="check" />
+            ) : (
+              <CheckButton
+                key={daysAgo}
+                habit={habit}
+                index={index}
+                value={habit.values[index]}
+                color={color}
+                onToggle={(x, y) => props.onToggle(daysAgo, x, y)}
+                onPopup={(x, y) => props.onPopup(daysAgo, x, y)}
+              />
+            ),
+          )}
+        </div>
+      </div>
     </div>
   );
 }

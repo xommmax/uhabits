@@ -147,7 +147,11 @@ class HabitsCore internal constructor(
      * Habits shown on the main screen, filtered and sorted like Android's
      * ListHabitsMenuBehavior (filters and sort order live in preferences).
      */
-    fun listHabits(searchQuery: String, days: Int): Array<dynamic> {
+    /**
+     * Habits of the main screen, each with [days] entries: values[i] is the day [firstDaysAgo] + i days before
+     * today, so the list can load only the days it shows while it is scrolled back in time.
+     */
+    fun listHabits(searchQuery: String, days: Int, firstDaysAgo: Int): Array<dynamic> {
         val today = getToday()
         val matcher = if (preferences.areQuestionMarksEnabled) {
             HabitMatcher(
@@ -168,7 +172,7 @@ class HabitsCore internal constructor(
         return filtered.map { habit ->
             val row = habitSummary(habit)
             row.score = habit.scores[today].value
-            val entries = Array(days) { habit.computedEntries.get(today.minus(it)) }
+            val entries = Array(days) { habit.computedEntries.get(today.minus(firstDaysAgo + it)) }
             row.values = entries.map { it.value }.toTypedArray()
             row.notes = entries.map { it.notes }.toTypedArray()
             row.completed = entries.map { it.completed }.toTypedArray()

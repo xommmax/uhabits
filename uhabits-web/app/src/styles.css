@@ -131,6 +131,11 @@ button:disabled { opacity: 0.35; cursor: default; }
   padding: 0 max(3px, env(safe-area-inset-right)) 0 max(3px, env(safe-area-inset-left));
 }
 .list-header-spacer { flex: 1; }
+/* The days, scrolled by dragging the dates (dayScroll.ts): one hidden day on each side, moved by --day-shift */
+.days { flex: none; overflow: hidden; }
+.list-header { touch-action: pan-y; }
+.days-track { display: flex; } .days-track > * { flex: none; }
+.days-track { transform: translateX(calc(var(--day-shift, 0px) - 48px)); }
 .day-label {
   width: 48px; display: flex; flex-direction: column; align-items: center;
   font-size: 10px; font-weight: 700; color: var(--muted); line-height: 12px;
