@@ -4,7 +4,7 @@ name: Deploy web app
 on:
   push:
     branches: [web-pwa]
-    paths: [uhabits-web/**, uhabits-core/**, .github/workflows/web-pages.yml]
+    paths: [uhabits-web/**, uhabits-core/**, kotlin-js-store/**, .github/workflows/web-pages.yml]
   workflow_dispatch:
 
 permissions:
