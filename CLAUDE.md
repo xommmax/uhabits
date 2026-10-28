@@ -23,7 +23,7 @@ Everything you need to work on the web app is in these files. Read them before c
 - `web-pwa`: the web app. **Every push to it deploys to the live site**, and the installed app updates
   itself on the iPhone. The deploy runs only when a push touches `uhabits-web/**`, `uhabits-core/**`,
   `kotlin-js-store/**` or the workflow.
-- `web-pwa-stable`: the last known-good version (1.0.6 at the time of writing). Move it only when the owner asks.
+- `web-pwa-stable`: the last known-good version (1.0.12 at the time of writing). Move it only when the owner asks.
 
 ## Working rules (from the owner)
 

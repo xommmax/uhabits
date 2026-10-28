@@ -34,13 +34,13 @@ official iOS app if one appears). Started 2026-10-25, built with Claude Code.
 | 1.0.3 | 10-27 | Android LSQ2 fling velocity, haptics, confetti 3D flip speed |
 | 1.0.4 | 10-27 | Rename category by long press only |
 | 1.0.5 | 10-27 | Day-row shadow, outlined auto checks |
-| 1.0.6 | 10-27 | Softer day-row shadow (tuned against Android pixels). **`web-pwa-stable` points here** |
+| 1.0.6 | 10-27 | Softer day-row shadow (tuned against Android pixels). |
 | 1.0.7 | 10-27 | Paint the status band (invisible band didn't work on iOS 27) |
 | 1.0.8 | 10-27 | `apple-mobile-web-app-status-bar-style` = black (needs re-install) |
 | 1.0.9 | 10-27 | iPhone haptics via real hidden switches in check cells |
 | 1.0.10 | 10-28 | Custom habit colours; habit-coloured edit toolbar in dark mode too |
 | 1.0.11 | 10-28 | Smooth drag-and-snap day scrolling on the date header, 60-day limit; CI lockfile fix |
-| 1.0.12 | 10-28 | Test suite (unit, bridge, UI) and fixes it found: old Loop backups (before DB v24) failed to import; Rewire/Tickmate check-ins only showed after reopening; failed imports said nothing; numbers like 12.04 showed "12" (Android: "12.0"); dates in the header were selectable; the status band cropped the top of the edit screen's Save button (now 32px tall instead of Android's 36dp) |
+| 1.0.12 | 10-28 | Test suite (unit, bridge, UI) and fixes it found: old Loop backups (before DB v24) failed to import; Rewire/Tickmate check-ins only showed after reopening; failed imports said nothing; numbers like 12.04 showed "12" (Android: "12.0"); dates in the header were selectable; the status band cropped the top of the edit screen's Save button (now 32px tall instead of Android's 36dp). **`web-pwa-stable` points here** |
 
 Owner confirmed on Android: confetti, vibration, and fling feel identical to Android. On the iPhone everything in
 1.0.11 was reported working by the owner (2026-10-28).
