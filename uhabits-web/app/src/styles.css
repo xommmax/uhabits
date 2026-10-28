@@ -133,7 +133,8 @@ button:disabled { opacity: 0.35; cursor: default; }
 .list-header-spacer { flex: 1; }
 /* The days, scrolled by dragging the dates (dayScroll.ts): one hidden day on each side, moved by --day-shift */
 .days { flex: none; overflow: hidden; }
-.list-header { touch-action: pan-y; }
+/* Dragged sideways: no text selection or callout menu, and selected dates would start a native drag instead */
+.list-header { touch-action: pan-y; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }
 .days-track { display: flex; } .days-track > * { flex: none; }
 .days-track { transform: translateX(calc(var(--day-shift, 0px) - 48px)); }
 .day-label {

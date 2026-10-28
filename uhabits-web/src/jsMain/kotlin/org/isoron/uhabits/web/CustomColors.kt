@@ -57,6 +57,12 @@ class CustomColors(private val db: Database) {
      * uuid, so their custom colors are now the backup's (none for a backup made by Android).
      */
     fun importFrom(source: Database) {
+        // Loop backups older than database version 24 have no uuids: their habits were imported as new
+        // habits, which have no custom colors
+        val uuidColumn = source.prepareStatement("SELECT 1 FROM pragma_table_info('Habits') WHERE name = 'uuid'")
+        val hasUuids = uuidColumn.step() == StepResult.ROW
+        uuidColumn.finalize()
+        if (!hasUuids) return
         val imported = read(source)
         val stmt = source.prepareStatement("SELECT uuid FROM Habits WHERE uuid IS NOT NULL")
         val uuids = mutableListOf<String>()

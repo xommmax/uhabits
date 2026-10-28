@@ -20,15 +20,16 @@ export function frequencyText(num: number, den: number): string {
 
 /** Port of core's Double.toShortString (NumberButton.kt). */
 export function shortNumber(v: number): string {
-  const trim = (x: number, digits: number) => String(Number(x.toFixed(digits)));
   if (v >= 1e9) return `${(v / 1e9).toFixed(1)}G`;
   if (v >= 1e8) return `${(v / 1e6).toFixed(0)}M`;
   if (v >= 1e6) return `${(v / 1e6).toFixed(1)}M`;
   if (v >= 1e5) return `${(v / 1e3).toFixed(0)}k`;
   if (v >= 1e3) return `${(v / 1e3).toFixed(1)}k`;
-  if (v >= 1e2) return trim(v, 0);
-  if (v >= 1e1) return trim(v, 1);
-  return trim(v, 2);
+  if (v >= 1e2) return v.toFixed(0);
+  // Decimals only when the value has them, but then as many as Android shows: 12.04 is "12.0", not "12"
+  if (v >= 1e1) return v.toFixed(Math.round(v) === v ? 0 : 1);
+  if (Math.round(v) === v) return v.toFixed(0);
+  return v.toFixed(Math.round(v * 10) === v * 10 ? 1 : 2);
 }
 
 // Entry values from core (org.isoron.uhabits.core.models.Entry)

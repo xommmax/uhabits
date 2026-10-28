@@ -432,6 +432,8 @@ class HabitsCore internal constructor(
             }
             if (!recognized) return@promise false
             importer.importHabitsFromFile(file)
+            // The Rewire and Tickmate importers don't recompute; Android's list does after an import
+            for (h in habitList) h.recompute()
             if (loopImporter.canHandle(file)) {
                 val source = WebDatabase(sqlJs, data)
                 customColors.importFrom(source)

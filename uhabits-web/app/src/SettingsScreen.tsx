@@ -50,12 +50,18 @@ export function SettingsScreen({ core, refresh, toast, onBack, onAbout }: Props)
   const importData = async () => {
     const data = await pickBackupFile();
     if (!data) return;
-    if (await core.importBackup(data)) {
-      refresh();
-      toast("Import successful");
-    } else {
-      toast("File not recognized");
+    try {
+      if (await core.importBackup(data)) {
+        toast("Import successful");
+      } else {
+        toast("File not recognized");
+      }
+    } catch {
+      // Android's could_not_import
+      toast("Failed to import data.");
     }
+    // A failed import may have imported some habits already
+    refresh();
   };
   const repair = () => {
     core.repairDatabase();
