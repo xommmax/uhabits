@@ -12,11 +12,13 @@ const migDir = `${ROOT}/uhabits-core/assets/main/migrations`;
 const resources = Object.fromEntries(fs.readdirSync(migDir).map((f) => [`migrations/${f}`, fs.readFileSync(path.join(migDir, f), "utf8")]));
 const A = `${ROOT}/uhabits-core/assets/test`;
 let fail = 0;
-for (const f of process.argv.slice(2)) {
+// Files: paths, or names in core's test assets; all of core's import fixtures when none are given
+const files = process.argv.length > 2 ? process.argv.slice(2) : ["loop.db", "databases/021.db", "databases/022.db", "rewire.db", "tickmate.db", "habitbull.csv", "habitbull2.csv", "habitbull3.csv", "habitbull4.csv"];
+for (const f of files) {
   const core = await openHabitsCore(SQL, null, resources);
   core.setShowArchived(true);
   let ok, err = "";
-  try { ok = await core.importBackup(new Uint8Array(fs.readFileSync(`${A}/${f}`))); } catch (e) { ok = false; err = String(e).slice(0, 160); }
+  try { ok = await core.importBackup(new Uint8Array(fs.readFileSync(path.resolve(A, f)))); } catch (e) { ok = false; err = String(e).slice(0, 160); }
   const rows = core.listHabits("", 3650, 0);
   const ticks = rows.reduce((n, r) => n + core.habitDetail(r.id).totalCount, 0);
   const bad = rows.filter((r) => !(r.score >= 0 && r.score <= 1));

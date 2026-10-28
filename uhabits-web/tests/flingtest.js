@@ -1,17 +1,31 @@
-const pw = require("playwright-core");
-let pass = 0, fail = 0;
-const check = (n, ok, d = "") => { ok ? pass++ : fail++; console.log(`${ok ? "  ok  " : "  FAIL"} ${n}${ok ? "" : "  -> " + d}`); };
+// Chart fling: a fast swipe coasts like Android's Scroller, stops at today, and a touch only stops it.
+// Usage: node flingtest.js [backup.db]   (a backup with bridge.mjs's habits; made with bridge.mjs when not given)
+const { execFileSync } = require("child_process");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { launch, engines, URL, checker } = require("./lib");
+const { check, done } = checker("fling checks");
+
+function backupFile() {
+  if (process.argv[2]) return process.argv[2];
+  const out = fs.mkdtempSync(path.join(os.tmpdir(), "fling-"));
+  execFileSync(process.execPath, [path.join(__dirname, "bridge.mjs"), out], { stdio: "ignore" });
+  return path.join(out, "backup-v25.db");
+}
+
 (async () => {
-  for (const engine of ["chromium", "webkit"]) {
+  const backup = backupFile();
+  for (const engine of engines()) {
     console.log(`# ${engine}`);
-    const b = engine === "webkit" ? await pw.webkit.launch() : await pw.chromium.launch({ executablePath: "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" });
+    const b = await launch(engine);
     const c = await b.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
     const p = await c.newPage();
     const errors = []; p.on("pageerror", (e) => errors.push(e.message));
-    await p.goto("http://localhost:4173/"); await p.waitForSelector(".intro, .topbar"); await p.getByRole("button", { name: "Skip" }).click();
+    await p.goto(URL); await p.waitForSelector(".intro, .topbar"); await p.getByRole("button", { name: "Skip" }).click();
     await p.getByLabel("More options").click(); await p.getByRole("button", { name: "Settings" }).click();
     const [ch] = await Promise.all([p.waitForEvent("filechooser"), p.getByText("Import data").click()]);
-    await ch.setFiles(process.argv[2]); await p.waitForTimeout(1500); await p.getByLabel("Back").click(); await p.waitForTimeout(500);
+    await ch.setFiles(backup); await p.waitForTimeout(1500); await p.getByLabel("Back").click(); await p.waitForTimeout(500);
     await p.locator(".habit-name", { hasText: /^daily-random-2y$/ }).click(); await p.waitForTimeout(600);
     const chart = p.locator(".card", { hasText: "History" }).locator("canvas");
     const snap = () => chart.evaluate((cv) => cv.toDataURL());
@@ -61,5 +75,5 @@ const check = (n, ok, d = "") => { ok ? pass++ : fail++; console.log(`${ok ? "  
     check("no page errors", errors.length === 0, errors.join(" | "));
     await b.close();
   }
-  console.log(`\nfling checks: ${pass}/${pass + fail} passed`);
+  done();
 })();

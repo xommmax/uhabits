@@ -34,6 +34,7 @@ Everything you need to work on the web app is in these files. Read them before c
    screen shows the version, commit and build time, so the owner can tell which build is installed.
 3. After pushing, say which version/commit was pushed. Don't poll CI unless asked.
 4. Keep it lean: don't run the whole test suite after every small change; test risky changes and say so.
+   `npm test` is cheap enough for most changes; `npm run test:ui` before risky deploys. New behaviour gets a test.
    Don't produce review pages/artifacts unless asked.
 5. The look follows the **official Android app 1:1** (sizes in dp = CSS px). When in doubt, read the Android
    source in `uhabits-android/` and port its behaviour, constants and wording. iOS-specific choices are
@@ -50,7 +51,9 @@ npm install
 npm run core      # Kotlin bridge → uhabits-web/build/dist/js/productionLibrary (rerun after Kotlin changes)
 npm run build     # tsc + vite → dist/
 npm run preview   # http://localhost:4173
-node ../tests/bridge.mjs /tmp/out   # quick logic check without a browser
+npm run test:unit # UI logic, no Kotlin build needed (~10 s)
+npm test          # unit + bridge tests (real Kotlin core in Node; needs npm run core) (~25 s)
+npm run test:ui   # build + every Playwright UI test in Chromium (~6 min)
 ```
 
 Owner's machine quirk: `~/.npm` has root-owned files. Use `npm --cache <some temp dir> install`.

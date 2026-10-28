@@ -28,7 +28,8 @@ uhabits-web/
     vite.config.ts            PWA manifest, service worker, build info, "habits-core" alias
     src/                      screens, components, platform helpers (see ARCHITECTURE.md)
     public/                   icons, intro images
-  tests/                      Node and Playwright test scripts
+    test/unit, test/bridge    Vitest: UI logic with a fake core; the real Kotlin core in Node (npm test)
+  tests/                      Node scripts and Playwright UI tests (npm run test:ui); README explains all tests
   docs/                       this documentation
 ```
 

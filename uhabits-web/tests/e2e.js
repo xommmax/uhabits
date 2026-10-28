@@ -1,11 +1,9 @@
 // End-to-end UI tests for the web app, driven like a person would use it.
 // Usage: node e2e.js <outDir>
-const pw = require("playwright-core");
+const { URL, launch } = require("./lib");
 const ENGINE = process.env.ENGINE || "chromium";
 const fs = require("fs");
 const OUT = process.argv[2];
-const URL = "http://localhost:4173/";
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const ANDROID = { viewport: { width: 411, height: 854 }, deviceScaleFactor: 2.625, isMobile: true, hasTouch: true, locale: "en-US", timezoneId: "Europe/Berlin" };
 const G = { check: "", times: "", skip: "", q: "" };
 
@@ -62,7 +60,7 @@ async function createHabit(page, { name, numerical = false, color, freq, unit, t
 }
 const row = (page, name) => page.locator(".habit-row", { hasText: name });
 async function cellState(page, name, col) {
-  const c = row(page, name).locator(".check").nth(col);
+  const c = cellAt(page, name, col);
   const text = (await c.innerText()).trim();
   if (text === G.check) return (await c.locator(".auto").count()) ? "auto" : "yes";
   if (text === G.times) return "no";
@@ -70,8 +68,13 @@ async function cellState(page, name, col) {
   if (text === G.q) return "unknown";
   return text; // number cells
 }
-const columns = (page) => page.locator(".list-header .day-label").count();
+// The day row renders one hidden day on each side of the visible ones (for smooth scrolling)
+const columns = async (page) => (await page.locator(".list-header .day-label").count()) - 2;
 const todayCol = async (page) => (await columns(page)) - 1; // days are reversed by default: today is on the right
+/** Cell of habit [name] in visible column [col] (0 = leftmost visible day). */
+const cellAt = (page, name, col) => row(page, name).locator(".check").nth(col + 1);
+/** Visible day labels, left to right, like "WED 28". */
+const dayLabels = async (page) => (await page.locator(".list-header .day-label").allInnerTexts()).slice(1, -1).map((t) => t.replace(/\s+/g, " ").trim());
 async function openHabit(page, name) { await tap(page.locator(".habit-name", { hasText: name })); await page.waitForTimeout(400); }
 async function overview(page) {
   const v = await page.locator(".overview-value").allInnerTexts();
@@ -89,9 +92,13 @@ async function setSwitch(page, title, on) {
   if (isOn !== on) await tap(r.locator(".switch"));
 }
 function userVersion(buf) { return buf.readUInt32BE(60); }
+// Reads backup files with the app's sql.js (no sqlite3 command needed)
+const initSqlJs = require(require.resolve("sql.js", { paths: [require("path").join(__dirname, "../app")] }));
+let SQL;
+async function sqlite(bytes) { SQL ??= await initSqlJs(); return new SQL.Database(bytes); }
 
 (async () => {
-  const browser = ENGINE === "webkit" ? await pw.webkit.launch() : await pw.chromium.launch({ executablePath: CHROME });
+  const browser = await launch(ENGINE);
   console.log(`engine: ${ENGINE} ${browser.version()}`);
   const { context, page } = await newApp(browser, {}, { skipIntro: false });
 
@@ -107,7 +114,7 @@ function userVersion(buf) { return buf.readUInt32BE(60); }
     check("toolbar title is Alichka Habits 🩵", (await page.locator(".topbar-title").innerText()) === "Alichka Habits 🩵");
     check("empty list shows the star and message", (await page.locator(".empty p").innerText()) === "You have no active habits");
     check("5 day columns at S22 Ultra width", (await columns(page)) === 5);
-    const labels = (await page.locator(".day-label").allInnerTexts()).map((t) => t.replace(/\s+/g, " ").trim());
+    const labels = await dayLabels(page);
     const now = new Date();
     const todayLabel = `${now.toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Berlin" }).toUpperCase()} ${Number(now.toLocaleDateString("en-US", { day: "numeric", timeZone: "Europe/Berlin" }))}`;
     check("days in reverse order by default: today on the right", labels[4] === todayLabel, `${labels.join(" | ")} vs ${todayLabel}`);
@@ -146,43 +153,43 @@ function userVersion(buf) { return buf.readUInt32BE(60); }
   await group("Check-ins on the list", async () => {
     const t = await todayCol(page);
     check("today starts unticked", (await cellState(page, "Stretch", t)) === "no");
-    await tap(row(page, "Stretch").locator(".check").nth(t)); await page.waitForTimeout(150);
+    await tap(cellAt(page, "Stretch", t)); await page.waitForTimeout(150);
     check("tap ticks today (short press on by default)", (await cellState(page, "Stretch", t)) === "yes");
     await openHabit(page, "Stretch");
     let o = await overview(page);
     check("total = 1 after one tick", o.total === 1, JSON.stringify(o));
     check("score after one daily tick = 5%", o.score === "5%", o.score);
     await back(page);
-    await tap(row(page, "Stretch").locator(".check").nth(t)); await page.waitForTimeout(150);
+    await tap(cellAt(page, "Stretch", t)); await page.waitForTimeout(150);
     check("second tap unticks", (await cellState(page, "Stretch", t)) === "no");
-    for (let c = 0; c <= t; c++) { await tap(row(page, "Stretch").locator(".check").nth(c)); await page.waitForTimeout(80); }
+    for (let c = 0; c <= t; c++) { await tap(cellAt(page, "Stretch", c)); await page.waitForTimeout(80); }
     await openHabit(page, "Stretch");
     o = await overview(page);
     const expected = Math.round((1 - Math.pow(0.5, (t + 1) / 13)) * 100);
     check(`score after ${t + 1} daily ticks = ${expected}% (1 - 0.5^(n/13))`, o.score === `${expected}%`, o.score);
     check(`total = ${t + 1}`, o.total === t + 1);
     await back(page);
-    await longPress(page, row(page, "Read").locator(".check").nth(t));
+    await longPress(page, cellAt(page, "Read", t));
     check("long press opens the check-in popup", await page.locator(".entry-popup").isVisible());
     await page.locator(".popup-notes").fill("great chapter");
     await tap(page.locator(".entry-popup .popup-glyph").first());
     await page.waitForTimeout(150);
     check("popup tick saved", (await cellState(page, "Read", t)) === "yes");
-    check("note dot shown", (await row(page, "Read").locator(".check").nth(t).locator(".notes-dot").count()) === 1);
-    await longPress(page, row(page, "Read").locator(".check").nth(t));
+    check("note dot shown", (await cellAt(page, "Read", t).locator(".notes-dot").count()) === 1);
+    await longPress(page, cellAt(page, "Read", t));
     check("note kept when reopening", (await page.locator(".popup-notes").inputValue()) === "great chapter");
     await page.mouse.click(10, 840); await page.waitForTimeout(150);
-    await tap(row(page, "Water").locator(".check").nth(t));
+    await tap(cellAt(page, "Water", t));
     check("measurable tap opens number popup", await page.locator(".popup-number input").isVisible());
     await page.locator(".popup-number input").fill("1.5");
     await tap(page.getByRole("button", { name: "Save" }));
     await page.waitForTimeout(150);
-    check("measurable value shown as 1.5", (await row(page, "Water").locator(".check").nth(t).locator(".number").innerText()) === "1.5");
-    await tap(row(page, "Water").locator(".check").nth(t - 1));
+    check("measurable value shown as 1.5", (await cellAt(page, "Water", t).locator(".number").innerText()) === "1.5");
+    await tap(cellAt(page, "Water", t - 1));
     await page.locator(".popup-number input").fill("2,25");
     await tap(page.getByRole("button", { name: "Save" })); await page.waitForTimeout(150);
-    check("comma decimal accepted (2,25)", ["2.3", "2.25"].includes(await row(page, "Water").locator(".check").nth(t - 1).locator(".number").innerText()),
-      await row(page, "Water").locator(".check").nth(t - 1).locator(".number").innerText());
+    check("comma decimal accepted (2,25)", (await cellAt(page, "Water", t - 1).locator(".number").innerText()) === "2.25",
+      await cellAt(page, "Water", t - 1).locator(".number").innerText());
     await openHabit(page, "Water");
     check("target card drawn", (await page.locator(".card", { hasText: "Target" }).locator("canvas").count()) === 1);
     await back(page);
@@ -322,35 +329,35 @@ function userVersion(buf) { return buf.readUInt32BE(60); }
     await setSwitch(page, "Show question marks", true);
     await setSwitch(page, "Reverse order of days", false);
     await back(page);
-    const labels = (await page.locator(".day-label").allInnerTexts()).map((x) => x.split("\n")[0]);
+    const labels = (await dayLabels(page)).map((x) => x.split(" ")[0]);
     const today = new Date().toLocaleDateString("en-US", { weekday: "short", timeZone: "Europe/Berlin" }).toUpperCase();
     check("reverse off: today on the left", labels[0] === today, labels.join(","));
     check("question marks shown for days without data", (await cellState(page, "Beta", 1)) === "unknown");
-    await tap(row(page, "Beta").locator(".check").nth(0)); const s1 = await cellState(page, "Beta", 0);
-    await tap(row(page, "Beta").locator(".check").nth(0)); const s2 = await cellState(page, "Beta", 0);
-    await tap(row(page, "Beta").locator(".check").nth(0)); const s3 = await cellState(page, "Beta", 0);
-    await tap(row(page, "Beta").locator(".check").nth(0)); const s4 = await cellState(page, "Beta", 0);
+    await tap(cellAt(page, "Beta", 0)); const s1 = await cellState(page, "Beta", 0);
+    await tap(cellAt(page, "Beta", 0)); const s2 = await cellState(page, "Beta", 0);
+    await tap(cellAt(page, "Beta", 0)); const s3 = await cellState(page, "Beta", 0);
+    await tap(cellAt(page, "Beta", 0)); const s4 = await cellState(page, "Beta", 0);
     check("toggle cycle with skips and ?: yes → skip → no → ?", [s1, s2, s3, s4].join() === "yes,skip,no,unknown", [s1, s2, s3, s4].join());
     await openSettings(page);
     await setSwitch(page, "Toggle with short press", false);
     await back(page);
-    await tap(row(page, "Beta").locator(".check").nth(0));
+    await tap(cellAt(page, "Beta", 0));
     check("short press off: tap opens popup instead", await page.locator(".entry-popup").isVisible());
     await page.mouse.click(10, 840);
-    await longPress(page, row(page, "Beta").locator(".check").nth(0));
+    await longPress(page, cellAt(page, "Beta", 0));
     check("short press off: long press ticks", (await cellState(page, "Beta", 0)) === "yes");
     await openSettings(page);
     await setSwitch(page, "Toggle with short press", true); await setSwitch(page, "Enable skip days", false);
     await setSwitch(page, "Show question marks", false); await setSwitch(page, "Reverse order of days", true);
     await back(page);
     await page.waitForFunction(() => !document.querySelector("body > canvas"), null, { timeout: 8000 }).catch(() => {});
-    await tap(row(page, "Gamma").locator(".check").nth(await todayCol(page))); await page.waitForTimeout(150);
+    await tap(cellAt(page, "Gamma", await todayCol(page))); await page.waitForTimeout(150);
     check("confetti when ticking (animations on)", (await page.locator("body > canvas").count()) === 1);
     // canvas-confetti removes its canvas after 80 animation frames, so how long that takes depends on the frame rate
     const gone = await page.waitForFunction(() => !document.querySelector("body > canvas"), null, { timeout: 8000 }).then(() => true, () => false);
     check("confetti canvas removed afterwards", gone);
     await openSettings(page); await setSwitch(page, "Disable animations", true); await back(page);
-    await tap(row(page, "Alpha").locator(".check").nth(await todayCol(page))); await page.waitForTimeout(150);
+    await tap(cellAt(page, "Alpha", await todayCol(page))); await page.waitForTimeout(150);
     check("disable animations: no confetti", (await page.locator("body > canvas").count()) === 0);
     await tap(page.getByLabel("More options")); await tap(page.getByRole("button", { name: "Dark theme" }));
     await page.waitForTimeout(200);
@@ -487,14 +494,14 @@ function userVersion(buf) { return buf.readUInt32BE(60); }
   await group("Hide completed", async () => {
     const { context: c, page: p } = await newApp(browser);
     await createHabit(p, { name: "Solo" });
-    await tap(row(p, "Solo").locator(".check").nth(await todayCol(p)));
+    await tap(cellAt(p, "Solo", await todayCol(p)));
     await tap(p.getByLabel("Filter")); await tap(p.getByRole("button", { name: "Hide completed" }));
     check("done habit hidden, umbrella message", (await p.locator(".empty p").innerText()) === "You're all done for today!");
     await c.close();
   });
 
   await group("Dates: rollover at midnight, midnight delay, time zones, daylight saving", async () => {
-    const label = async (p) => (await p.locator(".day-label").last().innerText()).replace(/\s+/g, " ").trim();
+    const label = async (p) => (await dayLabels(p)).at(-1);
     for (const [tz, iso, expect, note] of [
       ["Europe/Berlin", "2026-03-29T12:00:00+02:00", "SUN 29", "Berlin, day clocks go forward"],
       ["Europe/Berlin", "2026-10-25T12:00:00+01:00", "SUN 25", "Berlin, day clocks go back"],
@@ -509,16 +516,15 @@ function userVersion(buf) { return buf.readUInt32BE(60); }
       await p.clock.install({ time: new Date(iso) });
       await p.goto(URL); await p.getByRole("button", { name: "Skip" }).click();
       await createHabit(p, { name: "T" });
-      const labels = (await p.locator(".day-label").allInnerTexts()).map((x) => x.replace(/\s+/g, " ").trim());
+      const labels = await dayLabels(p);
       check(`${note}: today is ${expect}`, labels[4] === expect, labels.join(" | "));
       const nums = labels.map((l) => Number(l.split(" ")[1]));
       const consecutive = nums.every((n, i) => i === 0 || n === nums[i - 1] + 1 || nums[i] === 1);
       check(`${note}: 5 consecutive days, none skipped or repeated`, consecutive && new Set(labels).size === 5, labels.join(" | "));
-      await tap(row(p, "T").locator(".check").nth(4));
+      await tap(cellAt(p, "T", 4));
       const [dl] = await Promise.all([p.waitForEvent("download"), openSettings(p).then(() => tap(p.getByText("Export full backup")))]);
       const f = `${OUT}/tz-${tz.replace("/", "_")}.db`; await dl.saveAs(f);
-      const { execSync } = require("child_process");
-      const ts = Number(execSync(`sqlite3 "${f}" "select timestamp from Repetitions"`).toString().trim());
+      const ts = Number((await sqlite(fs.readFileSync(f))).exec("select timestamp from Repetitions")[0].values[0][0]);
       const stored = new Date(ts).toISOString().slice(0, 10);
       const want = new Date(iso).toLocaleDateString("en-CA", { timeZone: tz });
       check(`${note}: tick stored for the local date ${want}`, stored === want, `stored ${stored}`);
@@ -538,6 +544,110 @@ function userVersion(buf) { return buf.readUInt32BE(60); }
     await p3.clock.runFor(3 * 3600_000); await p3.waitForTimeout(300);
     check("…and switches to WED 28 after 3:00", (await label(p3)) === "WED 28", await label(p3));
     await c3.close();
+  });
+
+  await group("Custom colours (1.0.10)", async () => {
+    const { context: c, page: p } = await newApp(browser);
+    await createHabit(p, { name: "Pink" });
+    await openHabit(p, "Pink"); await tap(p.getByLabel("Edit"));
+    await tap(p.getByLabel("Change color"));
+    check("colour picker has 20 colours and Custom…", (await p.locator(".color-picker .swatches .swatch").count()) === 20 && (await p.getByText("Custom…").count()) === 1);
+    await p.locator(".color-picker input[type=color]").fill("#ff69b4");
+    await p.waitForTimeout(200);
+    const button = await p.locator(".color-button").evaluate((e) => getComputedStyle(e).backgroundColor);
+    check("custom colour shown on the colour button", button === "rgb(255, 105, 180)", button);
+    await tap(p.getByRole("button", { name: "Save" }).first()); await p.waitForTimeout(300);
+    const bar = await p.locator(".topbar").evaluate((e) => getComputedStyle(e).backgroundColor);
+    check("habit screen toolbar in the custom colour", bar === "rgb(255, 105, 180)", bar);
+    await back(p);
+    const name = await p.locator(".habit-name span", { hasText: "Pink" }).evaluate((e) => getComputedStyle(e).color);
+    check("list name in the custom colour", name === "rgb(255, 105, 180)", name);
+    await tap(p.getByLabel("More options")); await tap(p.getByRole("button", { name: "Dark theme" })); await p.waitForTimeout(200);
+    const darkName = await p.locator(".habit-name span", { hasText: "Pink" }).evaluate((e) => getComputedStyle(e).color);
+    check("dark theme: the custom colour is lightened (#ffb4da)", darkName === "rgb(255, 180, 218)", darkName);
+    await openHabit(p, "Pink"); await tap(p.getByLabel("Edit"));
+    const editBar = await p.locator(".topbar").evaluate((e) => getComputedStyle(e).backgroundColor);
+    check("dark theme: the edit toolbar is in the habit's colour too", editBar === "rgb(255, 105, 180)", editBar);
+    await back(p); await back(p);
+    await tap(p.getByLabel("More options")); await tap(p.getByRole("button", { name: "Dark theme" }));
+    // the backup keeps it (web-only table) and stays Android-compatible (palette colour = nearest)
+    await openSettings(p);
+    const [dl] = await Promise.all([p.waitForEvent("download"), tap(p.getByText("Export full backup"))]);
+    const file = `${OUT}/custom-colour.db`; await dl.saveAs(file);
+    const db = await sqlite(fs.readFileSync(file));
+    check("backup: Habits.color is the nearest palette colour (pink, 15)", db.exec("select color from Habits where name='Pink'")[0].values[0][0] === 15);
+    check("backup: the custom colour is in WebCustomColors", db.exec("select color from WebCustomColors")[0].values[0][0] === 0xff69b4);
+    const fresh = await newApp(browser);
+    await openSettings(fresh.page);
+    const [ch] = await Promise.all([fresh.page.waitForEvent("filechooser"), tap(fresh.page.getByText("Import data"))]);
+    await ch.setFiles(file); await fresh.page.waitForTimeout(1200); await back(fresh.page);
+    const imported = await fresh.page.locator(".habit-name span", { hasText: "Pink" }).evaluate((e) => getComputedStyle(e).color);
+    check("import into a fresh app keeps the custom colour", imported === "rgb(255, 105, 180)", imported);
+    await fresh.context.close();
+    check("no console errors", p.errors.length === 0, p.errors.join(" | "));
+    await c.close();
+  });
+
+  await group("Import of an old Loop backup", async () => {
+    const ASSETS = require("path").join(__dirname, "../../uhabits-core/assets/test");
+    const importFile = async (p, file) => {
+      await openSettings(p);
+      const [ch] = await Promise.all([p.waitForEvent("filechooser"), tap(p.getByText("Import data"))]);
+      await ch.setFiles(file);
+      await p.locator(".toast").waitFor({ timeout: 5000 }).catch(() => {});
+      const toast = await p.locator(".toast").allInnerTexts();
+      await back(p);
+      return toast.join();
+    };
+    const { context: c, page: p } = await newApp(browser);
+    check("a 2016 Loop backup (database v12) imports", (await importFile(p, `${ASSETS}/loop.db`)) === "Import successful");
+    await tap(p.getByLabel("Filter")); await tap(p.getByRole("button", { name: "Hide archived" }));
+    check("…with all its 9 habits", (await p.locator(".habit-row").count()) === 9, String(await p.locator(".habit-row").count()));
+    check("…the first is 'Wake up early', 3 times per week", (await p.locator(".habit-name span").first().innerText()) === "Wake up early");
+    await openHabit(p, "Wake up early");
+    check("…with its history", Number((await p.locator(".overview-value").allInnerTexts())[3]) > 0);
+    await back(p);
+    check("no console errors", p.errors.length === 0, p.errors.join(" | "));
+    await c.close();
+  });
+
+  await group("Imports from other apps", async () => {
+    const ASSETS = require("path").join(__dirname, "../../uhabits-core/assets/test");
+    const importFile = async (p, file) => {
+      await openSettings(p);
+      const [ch] = await Promise.all([p.waitForEvent("filechooser"), tap(p.getByText("Import data"))]);
+      await ch.setFiles(file);
+      await p.locator(".toast").waitFor({ timeout: 5000 }).catch(() => {});
+      const toast = await p.locator(".toast").allInnerTexts();
+      await back(p);
+      return toast.join();
+    };
+    const { context: c, page: p } = await newApp(browser);
+    check("Rewire import", (await importFile(p, `${ASSETS}/rewire.db`)) === "Import successful");
+    await openHabit(p, "brush teeth");
+    check("Rewire check-ins show right away, without reopening the app", Number((await p.locator(".overview-value").allInnerTexts())[3]) > 0);
+    await back(p);
+    check("Tickmate import", (await importFile(p, `${ASSETS}/tickmate.db`)) === "Import successful");
+    await openHabit(p, "Vegan");
+    check("Tickmate check-ins show right away", Number((await p.locator(".overview-value").allInnerTexts())[3]) > 0);
+    await back(p);
+    check("HabitBull CSV import", (await importFile(p, `${ASSETS}/habitbull.csv`)) === "Import successful");
+    check("a text file is not recognized", (await importFile(p, `${ASSETS}/hello.txt`)) === "File not recognized");
+    check("no console errors", p.errors.length === 0, p.errors.join(" | "));
+    await c.close();
+  });
+
+  await group("Measurable numbers like Android", async () => {
+    const { context: c, page: p } = await newApp(browser);
+    await createHabit(p, { name: "Km", numerical: true, unit: "km", target: 10 });
+    const t = await todayCol(p);
+    for (const [typed, shown] of [["12.04", "12.0"], ["12", "12"], ["0.5", "0.5"], ["1500", "1.5k"]]) {
+      await tap(cellAt(p, "Km", t)); await p.locator(".popup-number input").fill(typed);
+      await tap(p.getByRole("button", { name: "Save" })); await p.waitForTimeout(150);
+      const v = await cellAt(p, "Km", t).locator(".number").innerText();
+      check(`${typed} is shown as ${shown}`, v === shown, v);
+    }
+    await c.close();
   });
 
   await group("iPhone size (390 × 844)", async () => {
