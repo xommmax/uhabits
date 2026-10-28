@@ -17,7 +17,8 @@ const SETTLE_MS = 220;
 
 /** Kept while the list screen is closed, so returning from a habit doesn't jump back to today. */
 let savedPos = 0;
-export function useDayScroll(columnWidth: number, reversed: boolean) {
+/** [maxOffset] is how many days it can scroll back (Android: 60 days in all, the visible ones included). */
+export function useDayScroll(columnWidth: number, reversed: boolean, maxOffset: number) {
   const [offset, setOffset] = useState(() => Math.floor(savedPos / columnWidth));
   const listRef = useRef<HTMLDivElement>(null);
   const s = useRef({
@@ -30,7 +31,7 @@ export function useDayScroll(columnWidth: number, reversed: boolean) {
   const direction = reversed ? 1 : -1;
 
   const apply = (pos: number) => {
-    s.pos = savedPos = Math.max(0, pos);
+    s.pos = savedPos = Math.min(maxOffset * columnWidth, Math.max(0, pos));
     const whole = Math.floor(s.pos / columnWidth);
     const rest = s.pos - whole * columnWidth;
     listRef.current?.style.setProperty("--day-shift", `${direction * rest}px`);
@@ -39,7 +40,7 @@ export function useDayScroll(columnWidth: number, reversed: boolean) {
       setOffset(whole);
     }
   };
-  useLayoutEffect(() => apply(s.pos), [columnWidth, reversed]);
+  useLayoutEffect(() => apply(s.pos), [columnWidth, reversed, maxOffset]);
 
   const stop = () => {
     if (s.frame === undefined) return false;
@@ -54,7 +55,7 @@ export function useDayScroll(columnWidth: number, reversed: boolean) {
     const from = s.pos;
     const f = Math.abs(velocity) >= MIN_FLING_VELOCITY ? fling(velocity) : null;
     const total = f ? f.distanceAt(f.duration) : 0;
-    const to = Math.max(0, Math.round((from + total) / columnWidth) * columnWidth);
+    const to = Math.min(maxOffset, Math.max(0, Math.round((from + total) / columnWidth))) * columnWidth;
     if (to === from) return;
     // Android's fling curve, stretched to land on the day; a short ease-out when there was no fling
     const useFling = f !== null && Math.abs(total) > columnWidth / 2;

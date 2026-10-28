@@ -14,6 +14,8 @@ import { isNightMode, toggleNightMode } from "./theme";
 const COLUMN_WIDTH = 48;
 const NAME_MIN_WIDTH = 160;
 const LONG_PRESS_MS = 500;
+// ListHabitsRootView.MAX_CHECKMARK_COUNT: the days can be scrolled back until the oldest shown is 59 days ago
+const MAX_CHECKMARK_COUNT = 60;
 
 // Android's res/values/strings.xml "hints" array
 const HINTS = [
@@ -87,7 +89,7 @@ export function ListScreen({ core, rev, refresh, toast, onOpen, onAdd, onEdit, o
   void rev;
 
   const reversed = getBool(Pref.reverseDays);
-  const dayScroll = useDayScroll(COLUMN_WIDTH, reversed);
+  const dayScroll = useDayScroll(COLUMN_WIDTH, reversed, Math.max(0, MAX_CHECKMARK_COUNT - columns));
   // The visible days plus one on each side, which come into view while scrolling
   const firstDaysAgo = dayScroll.offset - 1;
   const habits = core.listHabits("", columns + 2, firstDaysAgo) as HabitRow[];
