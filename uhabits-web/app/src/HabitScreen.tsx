@@ -1,3 +1,6 @@
+// Android's ShowHabitActivity: the habit's cards (overview, target, calendar, score, history, streaks,
+// frequency, notes), drawn by core's charts on canvases (ChartHandle.kt, AndroidCharts.kt).
+
 import { useRef, useState } from "preact/hooks";
 import { haptic } from "./haptics";
 import type { HabitsCore } from "./core";

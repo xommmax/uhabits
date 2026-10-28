@@ -1,3 +1,6 @@
+// Starts the Kotlin core (habits-core = uhabits-web compiled to JS) on sql.js, and saves the database
+// to IndexedDB after every change. See docs/ARCHITECTURE.md for the whole picture.
+
 import initSqlJs from "sql.js";
 import wasmUrl from "sql.js/dist/sql-wasm.wasm?url";
 import { openHabitsCore, type HabitsCore } from "habits-core";

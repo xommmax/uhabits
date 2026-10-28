@@ -184,9 +184,8 @@ export function HabitTypePicker(props: { onPick: (numerical: boolean) => void; o
   );
 }
 
-/** Android's ColorPickerDialog: the 20 palette colors. */
 /**
- * Android's 20-color palette, plus "Custom…", which opens the phone's own color picker
+ * Android's ColorPickerDialog: the 20-color palette, plus "Custom…", which opens the phone's own color picker
  * (Apple's color sheet on an iPhone, Chrome's picker on Android).
  */
 export function ColorPicker(props: {

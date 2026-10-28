@@ -93,6 +93,11 @@ fun openHabitsCore(sqlJs: dynamic, data: Uint8Array?, resources: dynamic): Promi
     }
 }
 
+/**
+ * The API of core for the Preact app: everything the UI reads or changes goes through here, mostly via core's
+ * Commands, like on Android. Returned objects are plain JS objects whose shapes are in app/src/types.ts.
+ * Dates are days since 2000-01-01; entry values are core's Entry constants (thousandths when measurable).
+ */
 @JsExport
 class HabitsCore internal constructor(
     private val sqlJs: dynamic,
@@ -144,11 +149,8 @@ class HabitsCore internal constructor(
     }
 
     /**
-     * Habits shown on the main screen, filtered and sorted like Android's
-     * ListHabitsMenuBehavior (filters and sort order live in preferences).
-     */
-    /**
-     * Habits of the main screen, each with [days] entries: values[i] is the day [firstDaysAgo] + i days before
+     * Habits of the main screen, filtered and sorted like Android's ListHabitsMenuBehavior (filters and sort
+     * order live in preferences), each with [days] entries: values[i] is the day [firstDaysAgo] + i days before
      * today, so the list can load only the days it shows while it is scrolled back in time.
      */
     fun listHabits(searchQuery: String, days: Int, firstDaysAgo: Int): Array<dynamic> {

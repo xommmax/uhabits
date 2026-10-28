@@ -1,3 +1,6 @@
+// Android's ListHabitsActivity: the habit list with one column per day, its toolbars, menus and dialogs.
+// Layout and gestures follow ListHabitsRootView, HabitCardView, CheckmarkButtonView and HeaderView.
+
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { HabitRow } from "./types";

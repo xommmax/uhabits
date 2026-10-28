@@ -24,7 +24,7 @@ export interface HabitSummary {
 }
 
 export interface HabitRow extends HabitSummary {
-  /** Check-in values, index 0 = today (thousandths for measurable habits). */
+  /** Check-in values, index i = the day firstDaysAgo + i days before today (see listHabits; thousandths for measurable habits). */
   values: number[];
   notes: string[];
   completed: boolean[];

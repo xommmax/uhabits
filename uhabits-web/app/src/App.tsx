@@ -1,3 +1,6 @@
+// Root component: a tiny state router (Route in types.ts), the toast, the intro, and the day rollover.
+// Screens read everything from core while rendering; after a change they call refresh(), which bumps rev.
+
 import { useEffect, useState } from "preact/hooks";
 import type { HabitsCore } from "./core";
 import type { Route } from "./types";
